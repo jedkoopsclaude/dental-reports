@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"/c/Users/Jed Koops/projects/dental-reports\" && git add -A && { git diff --cached --quiet || { git commit -m \"auto: sync project files\" && git push origin master && git push github master; }; } 2>/dev/null || true"
+          }
+        ]
+      }
+    ]
+  }
+}
