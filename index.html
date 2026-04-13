@@ -1,0 +1,1141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OD Reports</title>
+  <!-- Google Fonts: Inter -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <!-- React 18 + Babel -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    :root {
+      --primary: #18BFFF;
+      --primary-dark: #0ea5d9;
+      --accent: #FCB400;
+      --danger: #EF4444;
+      --success: #22C55E;
+      --bg: #FFFFFF;
+      --surface: #F5F5F5;
+      --surface-hover: #EAEAEA;
+      --sidebar-bg: #1F2937;
+      --sidebar-hover: #374151;
+      --sidebar-active: #18BFFF;
+      --text: #333333;
+      --text-muted: #6B7280;
+      --text-light: #9CA3AF;
+      --border: #E5E7EB;
+      --radius: 8px;
+      --shadow: 0 1px 3px rgba(0,0,0,0.1);
+      --font: 'Inter', -apple-system, sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: var(--font); color: var(--text); background: var(--bg); }
+    #root { display: flex; height: 100vh; overflow: hidden; }
+    .layout { display: flex; width: 100%; height: 100%; }
+    .sidebar { width: 240px; min-width: 240px; background: var(--sidebar-bg); color: white; display: flex; flex-direction: column; overflow-y: auto; }
+    .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    .header { padding: 16px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; background: var(--bg); }
+    .content { flex: 1; overflow-y: auto; padding: 24px; background: var(--surface); }
+
+    .sidebar-logo { padding: 20px 16px; font-size: 18px; font-weight: 700; color: white; border-bottom: 1px solid #374151; display: flex; align-items: center; gap: 8px; }
+    .sidebar-section { padding: 16px 8px 8px; font-size: 11px; font-weight: 600; color: #9CA3AF; text-transform: uppercase; letter-spacing: 0.05em; padding-left: 16px; }
+    .sidebar-item { display: flex; align-items: center; gap: 8px; padding: 10px 16px; cursor: pointer; border-radius: 6px; margin: 2px 8px; font-size: 14px; font-weight: 500; color: #D1D5DB; transition: background 0.15s; }
+    .sidebar-item:hover { background: var(--sidebar-hover); color: white; }
+    .sidebar-item.active { background: #1e3a5f; color: var(--primary); }
+    .sidebar-item svg { opacity: 0.7; flex-shrink: 0; }
+    .sidebar-item.active svg { opacity: 1; }
+
+    .month-nav { display: flex; align-items: center; gap: 8px; }
+    .month-label { font-size: 18px; font-weight: 600; min-width: 140px; text-align: center; }
+    .month-select { font-family: var(--font); font-size: 16px; font-weight: 600; border: 1px solid transparent; border-radius: var(--radius); padding: 6px 8px; background: var(--bg); cursor: pointer; color: var(--text); outline: none; transition: border-color 0.15s; }
+    .month-select:hover { border-color: var(--border); }
+    .month-select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(24,191,255,0.15); }
+    .year-label { font-size: 16px; font-weight: 600; padding: 6px 8px; border-radius: var(--radius); cursor: pointer; border: 1px solid transparent; transition: border-color 0.15s, background 0.15s; white-space: nowrap; }
+    .year-label:hover { border-color: var(--border); background: var(--surface); }
+    .year-input { font-family: var(--font); font-size: 16px; font-weight: 600; width: 72px; padding: 6px 8px; border: 1px solid var(--primary); border-radius: var(--radius); outline: none; box-shadow: 0 0 0 3px rgba(24,191,255,0.15); text-align: center; -moz-appearance: textfield; }
+    .year-input::-webkit-outer-spin-button, .year-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    .btn { padding: 8px 16px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--bg); cursor: pointer; font-size: 14px; font-family: var(--font); font-weight: 500; transition: all 0.15s; }
+    .btn:hover { background: var(--surface-hover); }
+    .btn-primary { background: var(--primary); color: white; border-color: var(--primary); }
+    .btn-primary:hover { background: var(--primary-dark); }
+    .btn-icon { padding: 8px 12px; font-size: 16px; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .report-section { background: var(--bg); border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 20px; overflow: hidden; box-shadow: var(--shadow); }
+    .report-section-header { padding: 14px 20px; border-bottom: 1px solid var(--border); font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); background: var(--surface); display: flex; justify-content: space-between; align-items: center; }
+    .report-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    .report-table th { text-align: left; padding: 10px 16px; font-size: 12px; font-weight: 600; color: var(--text-muted); background: var(--surface); border-bottom: 1px solid var(--border); }
+    .report-table td { padding: 10px 16px; border-bottom: 1px solid var(--border); }
+    .report-table tr:last-child td { border-bottom: none; }
+    .report-table tr.subtotal td { background: #f0f9ff; font-weight: 600; }
+    .report-table tr.total td { background: #e0f2fe; font-weight: 700; font-size: 15px; }
+    .money { text-align: right; font-variant-numeric: tabular-nums; }
+    .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; padding: 20px; }
+    .stat-card { background: var(--surface); border-radius: var(--radius); padding: 16px; }
+    .stat-label { font-size: 12px; color: var(--text-muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px; }
+    .stat-value { font-size: 24px; font-weight: 700; color: var(--text); }
+    .stat-sub { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+    .loading { display: flex; align-items: center; justify-content: center; padding: 60px; color: var(--text-muted); font-size: 14px; gap: 10px; }
+    .error-box { background: #fef2f2; border: 1px solid #fecaca; border-radius: var(--radius); padding: 16px; color: #dc2626; margin: 20px 0; font-size: 14px; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+    .badge-blue { background: #dbeafe; color: #1d4ed8; }
+    .badge-green { background: #dcfce7; color: #15803d; }
+    .badge-yellow { background: #fef9c3; color: #a16207; }
+
+    .ai-container { background: var(--bg); border-radius: var(--radius); border: 1px solid var(--border); overflow: hidden; box-shadow: var(--shadow); }
+    .ai-input-area { padding: 20px; border-bottom: 1px solid var(--border); }
+    .ai-textarea { width: 100%; min-height: 80px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius); font-family: var(--font); font-size: 14px; resize: vertical; outline: none; }
+    .ai-textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(24,191,255,0.15); }
+    .sql-display { padding: 16px 20px; background: #1e1e2e; color: #cdd6f4; font-family: monospace; font-size: 13px; white-space: pre-wrap; border-bottom: 1px solid var(--border); }
+    .sql-textarea { width: 100%; padding: 12px; background: #1e1e2e; color: #cdd6f4; font-family: monospace; font-size: 13px; border: none; resize: vertical; min-height: 80px; outline: none; }
+    .sql-label { padding: 10px 20px; background: var(--surface); border-bottom: 1px solid var(--border); font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; }
+    .sql-actions { padding: 12px 20px; display: flex; gap: 8px; align-items: center; }
+
+    .chart-container { background: var(--bg); border-radius: var(--radius); border: 1px solid var(--border); padding: 20px; margin-bottom: 20px; box-shadow: var(--shadow); }
+    .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .chart-title { font-size: 16px; font-weight: 600; }
+    .chart-controls { display: flex; gap: 8px; align-items: center; }
+    .chart-canvas-wrap { position: relative; height: 300px; }
+
+    .picker-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100; display: flex; align-items: center; justify-content: center; }
+    .picker-modal { background: var(--bg); border-radius: 12px; padding: 28px; width: 340px; box-shadow: 0 8px 32px rgba(0,0,0,0.18); }
+    .picker-modal h3 { font-size: 15px; font-weight: 600; margin-bottom: 20px; }
+    .picker-field { margin-bottom: 16px; }
+    .picker-field label { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px; }
+    .picker-field input[type="date"] { width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: var(--radius); font-family: var(--font); font-size: 14px; outline: none; transition: border-color 0.15s; }
+    .picker-field input[type="date"]:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(24,191,255,0.15); }
+    .picker-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 24px; }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .spinner {
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+      border: 2px solid var(--border);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+
+    .monthly-layout { display: flex; gap: 20px; align-items: flex-start; }
+    .monthly-left  { width: 500px; min-width: 500px; }
+    .monthly-right { flex: 1; min-width: 180px; }
+    .monthly-right .stat-grid { grid-template-columns: 1fr 1fr; padding: 12px; gap: 10px; }
+    .monthly-right .stat-card { padding: 12px; }
+    .monthly-right .stat-value { font-size: 20px; }
+
+    @media print {
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .sidebar, .header { display: none !important; }
+      .content { padding: 0 !important; background: white !important; }
+      .monthly-layout { display: flex !important; gap: 16px; }
+      .monthly-left { width: 480px; min-width: 480px; }
+      .report-section { box-shadow: none; border: 1px solid #ccc; page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    // ── API helpers ──────────────────────────────────────────────────────────
+    async function runQuery(sql) {
+      const res = await fetch('/api/query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sql })
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    }
+
+    async function runAI(prompt, month) {
+      const res = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, month })
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const { sql } = await res.json();
+      return sql;
+    }
+
+    // ── Utility functions ────────────────────────────────────────────────────
+    const fmt = (n) => n == null ? '$0.00' : '$' + parseFloat(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const fmtN = (n) => n == null ? '0' : parseFloat(n).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
+    const getMonthRange = (yearMonth) => {
+      const [year, month] = yearMonth.split('-').map(Number);
+      const start = new Date(year, month - 1, 1);
+      const end = new Date(year, month, 0);
+      const pad = (n) => String(n).padStart(2, '0');
+      return {
+        startDate: `${year}-${pad(month)}-01`,
+        endDate: `${year}-${pad(month)}-${pad(end.getDate())}`
+      };
+    };
+
+    const fmtMonth = (yearMonth) => {
+      const [year, month] = yearMonth.split('-').map(Number);
+      return new Date(year, month - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    };
+
+    const addMonth = (yearMonth, delta) => {
+      const [year, month] = yearMonth.split('-').map(Number);
+      const d = new Date(year, month - 1 + delta, 1);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    };
+
+    // ── Constants ────────────────────────────────────────────────────────────
+    const PROV_JED = 43;
+    const PROV_ASSOC = 216;
+    const CROWN_CODES = "'D2740','D6058','D6740','D6245','D6548'";
+
+    const REPORTS = [
+      { id: 'monthly', name: 'Monthly Stats', icon: '\u{1F4CA}' },
+      { id: 'assoclabs', name: 'Associate Labs', icon: '\u{1F52C}' },
+    ];
+    const CHART_VIEWS = [
+      { id: 'prod-trends', name: 'Production Trends', icon: '\u{1F4C8}' },
+      { id: 'coll-trends', name: 'Collections Trends', icon: '\u{1F4B0}' },
+    ];
+
+    // ── Sidebar ──────────────────────────────────────────────────────────────
+    function Sidebar({ activeView, onNavigate }) {
+      return (
+        <div className="sidebar">
+          <div className="sidebar-logo">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/>
+            </svg>
+            OD Reports
+          </div>
+
+          <div className="sidebar-section">Reports</div>
+          {REPORTS.map(r => (
+            <div key={r.id}
+              className={`sidebar-item ${activeView === r.id ? 'active' : ''}`}
+              onClick={() => onNavigate(r.id)}>
+              <span style={{fontSize:16}}>{r.icon}</span>
+              {r.name}
+            </div>
+          ))}
+
+          <div className="sidebar-section" style={{marginTop:8}}>AI Query</div>
+          <div className={`sidebar-item ${activeView === 'ai-query' ? 'active' : ''}`}
+            onClick={() => onNavigate('ai-query')}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+            </svg>
+            Query Builder
+          </div>
+
+          <div className="sidebar-section" style={{marginTop:8}}>Charts</div>
+          {CHART_VIEWS.map(c => (
+            <div key={c.id}
+              className={`sidebar-item ${activeView === c.id ? 'active' : ''}`}
+              onClick={() => onNavigate(c.id)}>
+              <span style={{fontSize:16}}>{c.icon}</span>
+              {c.name}
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    // ── MonthlyStats ─────────────────────────────────────────────────────────
+    function MonthlyStats({ month }) {
+      const [data, setData] = React.useState(null);
+      const [loading, setLoading] = React.useState(true);
+      const [error, setError] = React.useState(null);
+
+      React.useEffect(() => {
+        let cancelled = false;
+        const load = async () => {
+          setLoading(true);
+          setError(null);
+          try {
+            const { startDate: s, endDate: e } = getMonthRange(month);
+            const [
+              prodRows,
+              adjRows,
+              writeoffRows,
+              assocPatRows,
+              assocInsRows,
+              officePatRows,
+              officeInsRows,
+              visitRows,
+              newPatRows,
+              jedDayRows,
+              assocDayRows,
+              jedCrownRows,
+              assocCrownRows,
+            ] = await Promise.all([
+              runQuery(`SELECT pl.ProvNum as id, CONCAT(pr.FName,' ',pr.LName) as provName, pr.IsSecondary as isHygienist, SUM(pl.ProcFee*(pl.UnitQty+pl.BaseUnits)) AS fees FROM procedurelog pl LEFT JOIN provider pr ON pl.ProvNum=pr.ProvNum WHERE pl.ProcDate BETWEEN '${s}' AND '${e}' AND pl.ProcStatus=2 GROUP BY pr.IsSecondary DESC,pr.LName,pr.FName`),
+              runQuery(`SELECT SUM(AdjAmt) as totaladj FROM adjustment WHERE AdjDate BETWEEN '${s}' AND '${e}'`),
+              runQuery(`SELECT SUM(-cp.Writeoff) AS totalw FROM claimproc cp WHERE cp.status IN (1,4,5,7) AND cp.DateCp BETWEEN '${s}' AND '${e}'`),
+              runQuery(`SELECT SUM(ps.SplitAmt) AS pattotal FROM paysplit ps WHERE ps.ProvNum=${PROV_ASSOC} AND ps.DatePay BETWEEN '${s}' AND '${e}'`),
+              runQuery(`SELECT SUM(cp.InsPayAmt) AS instotal FROM claimpayment cy INNER JOIN claimproc cp ON cp.ClaimPaymentNum=cy.ClaimPaymentNum WHERE cp.ProvNum=${PROV_ASSOC} AND cy.CheckDate BETWEEN '${s}' AND '${e}'`),
+              runQuery(`SELECT SUM(ps.SplitAmt) AS pattotal FROM paysplit ps WHERE ps.DatePay BETWEEN '${s}' AND '${e}'`),
+              runQuery(`SELECT SUM(cp.InsPayAmt) AS instotal FROM claimpayment cy INNER JOIN claimproc cp ON cp.ClaimPaymentNum=cy.ClaimPaymentNum WHERE cy.CheckDate BETWEEN '${s}' AND '${e}'`),
+              runQuery(`SELECT COUNT(apt.AptNum) AS Total FROM patient p INNER JOIN appointment apt ON apt.PatNum=p.PatNum AND apt.AptStatus=2 AND apt.AptDateTime BETWEEN '${s}' AND '${e}'+INTERVAL 1 DAY`),
+              runQuery(`SELECT COUNT(p.PatNum) AS Total FROM patient p INNER JOIN (SELECT Q.PatNum,Q.FirstVisit FROM(SELECT apt.PatNum,MIN(apt.AptDateTime) AS FirstVisit FROM appointment apt WHERE apt.AptStatus IN(1,2,4) GROUP BY apt.PatNum)Q WHERE DATE(Q.FirstVisit) BETWEEN '${s}' AND '${e}') firstApt ON firstApt.PatNum=p.PatNum`),
+              runQuery(`SELECT COUNT(DISTINCT pl.ProcDate) AS Total FROM procedurelog pl WHERE pl.ProcDate BETWEEN '${s}' AND '${e}' AND pl.ProvNum=${PROV_JED} AND pl.ProcFee*(pl.UnitQty+pl.BaseUnits) > 0 AND pl.ProcStatus=2`),
+              runQuery(`SELECT COUNT(DISTINCT pl.ProcDate) AS Total FROM procedurelog pl WHERE pl.ProcDate BETWEEN '${s}' AND '${e}' AND pl.ProvNum=${PROV_ASSOC} AND pl.ProcFee*(pl.UnitQty+pl.BaseUnits) > 0 AND pl.ProcStatus=2`),
+              runQuery(`SELECT COUNT(*) AS Total FROM procedurelog pl INNER JOIN procedurecode pc ON pc.CodeNum=pl.CodeNum WHERE pl.ProvNum=${PROV_JED} AND pl.ProcDate BETWEEN '${s}' AND '${e}' AND pl.ProcStatus=2 AND pc.ProcCode IN (${CROWN_CODES})`),
+              runQuery(`SELECT COUNT(*) AS Total FROM procedurelog pl INNER JOIN procedurecode pc ON pc.CodeNum=pl.CodeNum WHERE pl.ProvNum=${PROV_ASSOC} AND pl.ProcDate BETWEEN '${s}' AND '${e}' AND pl.ProcStatus=2 AND pc.ProcCode IN (${CROWN_CODES})`),
+            ]);
+
+            if (cancelled) return;
+
+            // Production calculations
+            const restorative = prodRows.filter(r => r.isHygienist == 0);
+            const hygiene = prodRows.filter(r => r.isHygienist == 1);
+            const restTotal = restorative.reduce((sum, r) => sum + parseFloat(r.fees || 0), 0);
+            const hygTotal = hygiene.reduce((sum, r) => sum + parseFloat(r.fees || 0), 0);
+            const grandTotal = restTotal + hygTotal;
+            const hygienePercent = grandTotal ? (hygTotal / grandTotal * 100) : 0;
+
+            const adjTotal = parseFloat(adjRows[0]?.totaladj || 0);
+            const writeoffTotal = parseFloat(writeoffRows[0]?.totalw || 0);
+            const netProd = grandTotal + adjTotal + writeoffTotal;
+
+            // Collections calculations
+            const assocPatAmt = parseFloat(assocPatRows[0]?.pattotal || 0);
+            const assocInsAmt = parseFloat(assocInsRows[0]?.instotal || 0);
+            const assocTotal = assocPatAmt + assocInsAmt;
+            const officePatAmt = parseFloat(officePatRows[0]?.pattotal || 0);
+            const officeInsAmt = parseFloat(officeInsRows[0]?.instotal || 0);
+            const officeTotal = officePatAmt + officeInsAmt;
+            const jedPatAmt = officePatAmt - assocPatAmt;
+            const jedInsAmt = officeInsAmt - assocInsAmt;
+            const jedTotal = jedPatAmt + jedInsAmt;
+            const insPercent = officeTotal ? (officeInsAmt / officeTotal * 100) : 0;
+            const patPercent = officeTotal ? (officePatAmt / officeTotal * 100) : 0;
+
+            // Activity
+            const visits = parseInt(visitRows[0]?.Total || 0);
+            const newPats = parseInt(newPatRows[0]?.Total || 0);
+            const jedDays = parseInt(jedDayRows[0]?.Total || 0);
+            const assocDays = parseInt(assocDayRows[0]?.Total || 0);
+            const jedCrowns = parseInt(jedCrownRows[0]?.Total || 0);
+            const assocCrowns = parseInt(assocCrownRows[0]?.Total || 0);
+
+            setData({
+              restorative, hygiene, restTotal, hygTotal, grandTotal, hygienePercent,
+              adjTotal, writeoffTotal, netProd,
+              assocPatAmt, assocInsAmt, assocTotal,
+              jedPatAmt, jedInsAmt, jedTotal,
+              officePatAmt, officeInsAmt, officeTotal,
+              insPercent, patPercent,
+              visits, newPats, jedDays, assocDays,
+              jedCrowns, assocCrowns,
+            });
+          } catch (e) {
+            if (!cancelled) setError(e.message);
+          } finally {
+            if (!cancelled) setLoading(false);
+          }
+        };
+        load();
+        return () => { cancelled = true; };
+      }, [month]);
+
+      if (loading) return <div className="loading"><span className="spinner"></span> Loading monthly stats...</div>;
+      if (error) return <div className="error-box">Error: {error}</div>;
+      if (!data) return null;
+
+      const d = data;
+
+      return (
+        <div className="monthly-layout">
+
+          {/* LEFT COLUMN: Production + Collections */}
+          <div className="monthly-left">
+            {/* PRODUCTION */}
+            <div className="report-section">
+              <div className="report-section-header">Production</div>
+              <table className="report-table">
+                <thead>
+                  <tr><th>Provider</th><th className="money">Amount</th></tr>
+                </thead>
+                <tbody>
+                  {d.restorative.map((r, i) => (
+                    <tr key={'r'+i}><td>{r.provName}</td><td className="money">{fmt(r.fees)}</td></tr>
+                  ))}
+                  <tr className="subtotal">
+                    <td>Subtotal Restorative</td>
+                    <td className="money">{fmt(d.restTotal)}</td>
+                  </tr>
+                  {d.hygiene.map((r, i) => (
+                    <tr key={'h'+i}><td>{r.provName}</td><td className="money">{fmt(r.fees)}</td></tr>
+                  ))}
+                  <tr className="subtotal">
+                    <td>Subtotal Hygiene ({d.hygienePercent.toFixed(1)}%)</td>
+                    <td className="money">{fmt(d.hygTotal)}</td>
+                  </tr>
+                  <tr><td colSpan="2" style={{height:8,borderBottom:'none'}}></td></tr>
+                  <tr>
+                    <td>Gross Production</td>
+                    <td className="money">{fmt(d.grandTotal)}</td>
+                  </tr>
+                  <tr>
+                    <td>Adjustments</td>
+                    <td className="money">{fmt(d.adjTotal)}</td>
+                  </tr>
+                  <tr>
+                    <td>Writeoffs</td>
+                    <td className="money">{fmt(d.writeoffTotal)}</td>
+                  </tr>
+                  <tr className="total">
+                    <td>Net Production</td>
+                    <td className="money">{fmt(d.netProd)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* COLLECTIONS */}
+            <div className="report-section">
+              <div className="report-section-header">Collections</div>
+              <table className="report-table">
+                <thead>
+                  <tr><th>Provider</th><th className="money">Patient Pay</th><th className="money">Ins Pay</th><th className="money">Total</th></tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Dr. Thanh</td>
+                    <td className="money">{fmt(d.assocPatAmt)}</td>
+                    <td className="money">{fmt(d.assocInsAmt)}</td>
+                    <td className="money">{fmt(d.assocTotal)}</td>
+                  </tr>
+                  <tr>
+                    <td>Dr. Jed</td>
+                    <td className="money">{fmt(d.jedPatAmt)}</td>
+                    <td className="money">{fmt(d.jedInsAmt)}</td>
+                    <td className="money">{fmt(d.jedTotal)}</td>
+                  </tr>
+                  <tr className="total">
+                    <td>Office Total</td>
+                    <td className="money">{fmt(d.officePatAmt)} ({d.patPercent.toFixed(1)}%)</td>
+                    <td className="money">{fmt(d.officeInsAmt)} ({d.insPercent.toFixed(1)}%)</td>
+                    <td className="money">{fmt(d.officeTotal)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* RIGHT COLUMN: Activity + Crown Units */}
+          <div className="monthly-right">
+            {/* ACTIVITY */}
+            <div className="report-section">
+              <div className="report-section-header">Activity</div>
+              <div className="stat-grid">
+                <div className="stat-card">
+                  <div className="stat-label">Total Visits</div>
+                  <div className="stat-value">{d.visits}</div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-label">New Patients</div>
+                  <div className="stat-value">{d.newPats}</div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-label">Jed Days Worked</div>
+                  <div className="stat-value">{d.jedDays}</div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-label">Assoc Days Worked</div>
+                  <div className="stat-value">{d.assocDays}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* CROWN UNITS */}
+            <div className="report-section">
+              <div className="report-section-header">Crown/Bridge Units</div>
+              <table className="report-table">
+                <thead>
+                  <tr><th>Provider</th><th className="money">Units</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>Dr. Jed</td><td className="money">{d.jedCrowns}</td></tr>
+                  <tr><td>Dr. Thanh</td><td className="money">{d.assocCrowns}</td></tr>
+                  <tr className="total"><td>Grand Total</td><td className="money">{d.jedCrowns + d.assocCrowns}</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      );
+    }
+
+    // ── AssocLabs ─────────────────────────────────────────────────────────────
+    function AssocLabs({ month }) {
+      const [data, setData] = React.useState(null);
+      const [loading, setLoading] = React.useState(true);
+      const [error, setError] = React.useState(null);
+
+      React.useEffect(() => {
+        let cancelled = false;
+        const load = async () => {
+          setLoading(true);
+          setError(null);
+          try {
+            const { startDate: s, endDate: e } = getMonthRange(month);
+            const [assocPatRows, assocInsRows, labCaseRows, assocCrownRows] = await Promise.all([
+              runQuery(`SELECT SUM(ps.SplitAmt) AS pattotal FROM paysplit ps WHERE ps.ProvNum=216 AND ps.DatePay BETWEEN '${s}' AND '${e}'`),
+              runQuery(`SELECT SUM(cp.InsPayAmt) AS instotal FROM claimpayment cy INNER JOIN claimproc cp ON cp.ClaimPaymentNum=cy.ClaimPaymentNum WHERE cp.ProvNum=216 AND cy.CheckDate BETWEEN '${s}' AND '${e}'`),
+              runQuery(`SELECT l.DateTimeRecd, CONCAT(p.FName,' ',p.LName) as Name, lab.Description, l.LabFee, a.Note FROM labcase l LEFT JOIN patient p ON p.PatNum=l.PatNum LEFT JOIN laboratory lab ON lab.LaboratoryNum=l.LaboratoryNum LEFT JOIN appointment a ON a.AptNum=l.AptNum WHERE l.ProvNum=216 AND l.DateTimeRecd BETWEEN '${s}' AND '${e}' ORDER BY l.DateTimeRecd`),
+              runQuery(`SELECT COUNT(*) AS Total FROM procedurelog pl INNER JOIN procedurecode pc ON pc.CodeNum=pl.CodeNum WHERE pl.ProvNum=216 AND pl.ProcDate BETWEEN '${s}' AND '${e}' AND pl.ProcStatus=2 AND pc.ProcCode IN ('D2740','D6058','D6740','D6245')`),
+            ]);
+
+            if (cancelled) return;
+
+            const assocPatAmt = parseFloat(assocPatRows[0]?.pattotal || 0);
+            const assocInsAmt = parseFloat(assocInsRows[0]?.instotal || 0);
+            const assocTotal = assocPatAmt + assocInsAmt;
+            const compensation = assocTotal * 0.35;
+            const totalLabFees = labCaseRows.reduce((sum, r) => sum + parseFloat(r.LabFee || 0), 0);
+            const labFeeShare = totalLabFees * 0.30;
+            const paycheck = compensation - labFeeShare;
+            const assocCrowns = parseInt(assocCrownRows[0]?.Total || 0);
+
+            setData({
+              assocTotal, compensation, totalLabFees, labFeeShare, paycheck,
+              labCases: labCaseRows, assocCrowns,
+            });
+          } catch (e) {
+            if (!cancelled) setError(e.message);
+          } finally {
+            if (!cancelled) setLoading(false);
+          }
+        };
+        load();
+        return () => { cancelled = true; };
+      }, [month]);
+
+      if (loading) return <div className="loading"><span className="spinner"></span> Loading associate labs...</div>;
+      if (error) return <div className="error-box">Error: {error}</div>;
+      if (!data) return null;
+
+      const d = data;
+
+      return (
+        <div style={{maxWidth:'700px'}}>
+          {/* COMPENSATION SUMMARY */}
+          <div className="report-section">
+            <div className="report-section-header">Compensation Summary</div>
+            <table className="report-table">
+              <thead>
+                <tr><th>Item</th><th className="money">Amount</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>Dr. Thanh's Collections</td><td className="money">{fmt(d.assocTotal)}</td></tr>
+                <tr><td>35% Compensation</td><td className="money">{fmt(d.compensation)}</td></tr>
+                <tr><td>Lab Fees Total</td><td className="money">{fmt(d.totalLabFees)}</td></tr>
+                <tr><td>30% Lab Fee Share</td><td className="money">-{fmt(d.labFeeShare)}</td></tr>
+                <tr className="total"><td>Paycheck</td><td className="money">{fmt(d.paycheck)}</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* LAB CASE DETAILS */}
+          <div className="report-section">
+            <div className="report-section-header">Lab Case Details</div>
+            <div style={{overflowX:'auto'}}>
+              <table className="report-table">
+                <thead>
+                  <tr><th>Received</th><th>Patient</th><th>Lab</th><th className="money">Fee</th><th>Note</th></tr>
+                </thead>
+                <tbody>
+                  {d.labCases.map((r, i) => (
+                    <tr key={i}>
+                      <td>{r.DateTimeRecd ? new Date(r.DateTimeRecd).toLocaleDateString() : ''}</td>
+                      <td>{r.Name}</td>
+                      <td>{r.Description}</td>
+                      <td className="money">{fmt(r.LabFee)}</td>
+                      <td style={{maxWidth:300,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.Note || ''}</td>
+                    </tr>
+                  ))}
+                  <tr className="total">
+                    <td colSpan="3">Lab Fees Total</td>
+                    <td className="money">{fmt(d.totalLabFees)}</td>
+                    <td></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* CROWN UNITS */}
+          <div className="report-section">
+            <div className="report-section-header">Crown/Bridge Units</div>
+            <div className="stat-grid">
+              <div className="stat-card">
+                <div className="stat-label">Dr. Thanh Crown/Bridge Units</div>
+                <div className="stat-value">{d.assocCrowns}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ── AIQuery ───────────────────────────────────────────────────────────────
+    function AIQuery({ month }) {
+      const [prompt, setPrompt] = React.useState('');
+      const [sql, setSql] = React.useState('');
+      const [editedSql, setEditedSql] = React.useState('');
+      const [results, setResults] = React.useState(null);
+      const [loadingAI, setLoadingAI] = React.useState(false);
+      const [loadingQuery, setLoadingQuery] = React.useState(false);
+      const [fixStatus, setFixStatus] = React.useState(null); // null | 'fixing' | 'fixed'
+      const [error, setError] = React.useState(null);
+      const [chartType, setChartType] = React.useState('table');
+      const chartRef = React.useRef(null);
+      const chartInstance = React.useRef(null);
+
+      const handleGenerate = async () => {
+        setLoadingAI(true);
+        setError(null);
+        setFixStatus(null);
+        try {
+          const generated = await runAI(prompt, month);
+          setSql(generated);
+          setEditedSql(generated);
+        } catch (e) {
+          setError(e.message);
+        } finally {
+          setLoadingAI(false);
+        }
+      };
+
+      const handleRun = async (sqlToRun, isRetry = false) => {
+        setLoadingQuery(true);
+        setError(null);
+        setResults(null);
+        setChartType('table');
+        if (!isRetry) setFixStatus(null);
+        try {
+          const rows = await runQuery(sqlToRun);
+          setResults(rows);
+        } catch (e) {
+          // On SQL error, auto-fix once via AI (only if this isn't already a retry)
+          const rawError = e.message;
+          const isSqlError = rawError.includes('SQL error') || rawError.includes('Unknown column') || rawError.includes('syntax');
+          if (isSqlError && !isRetry) {
+            setLoadingQuery(false);
+            setFixStatus('fixing');
+            try {
+              const fixRes = await fetch('/api/ai/fix', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sql: sqlToRun, error: rawError }),
+              });
+              if (!fixRes.ok) throw new Error(await fixRes.text());
+              const { sql: fixedSql } = await fixRes.json();
+              setEditedSql(fixedSql);
+              setSql(fixedSql);
+              setFixStatus('fixed');
+              await handleRun(fixedSql, true);
+            } catch (fixErr) {
+              setFixStatus(null);
+              setError(rawError); // show original error if fix also fails
+              setLoadingQuery(false);
+            }
+          } else {
+            setError(rawError);
+            setLoadingQuery(false);
+          }
+          return;
+        }
+        setLoadingQuery(false);
+      };
+
+      // Chart rendering
+      React.useEffect(() => {
+        if (!results || results.length === 0 || chartType === 'table') {
+          if (chartInstance.current) { chartInstance.current.destroy(); chartInstance.current = null; }
+          return;
+        }
+        const cols = Object.keys(results[0]);
+        // Prefer the first column whose values are non-numeric (e.g. ProviderName over ProvNum)
+        const labelCol = cols.find(c => isNaN(parseFloat(results[0][c]))) || cols[0];
+        const dataCols = cols.filter(c => c !== labelCol && !isNaN(parseFloat(results[0][c])));
+        if (dataCols.length === 0) return;
+
+        if (chartInstance.current) chartInstance.current.destroy();
+        const colors = ['#18BFFF','#FCB400','#22C55E','#EF4444','#8B5CF6'];
+        chartInstance.current = new Chart(chartRef.current, {
+          type: chartType,
+          data: {
+            labels: results.map(r => String(r[labelCol])),
+            datasets: dataCols.map((col, i) => ({
+              label: col,
+              data: results.map(r => parseFloat(r[col]) || 0),
+              backgroundColor: colors[i % colors.length] + (chartType === 'bar' ? 'CC' : '33'),
+              borderColor: colors[i % colors.length],
+              borderWidth: 2,
+              tension: 0.3,
+            }))
+          },
+          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' } } }
+        });
+        return () => { if (chartInstance.current) { chartInstance.current.destroy(); chartInstance.current = null; } };
+      }, [results, chartType]);
+
+      return (
+        <div>
+          <div className="ai-container">
+            <div className="ai-input-area">
+              <textarea
+                className="ai-textarea"
+                placeholder="Ask anything about your practice data, e.g. 'Show me total production by provider for the last 6 months'"
+                value={prompt}
+                onChange={e => setPrompt(e.target.value)}
+              />
+              <div style={{display:'flex',gap:'8px',marginTop:'12px'}}>
+                <button className="btn btn-primary" onClick={handleGenerate} disabled={!prompt || loadingAI}>
+                  {loadingAI ? 'Generating...' : 'Generate SQL \u2192'}
+                </button>
+              </div>
+            </div>
+
+            {sql && (
+              <div>
+                <div className="sql-label">Generated SQL (editable)</div>
+                <textarea
+                  className="sql-textarea"
+                  value={editedSql}
+                  onChange={e => setEditedSql(e.target.value)}
+                  rows={4}
+                />
+                <div className="sql-actions">
+                  <button className="btn btn-primary" onClick={() => handleRun(editedSql)} disabled={!editedSql || loadingQuery || fixStatus === 'fixing'}>
+                    {fixStatus === 'fixing' ? 'Auto-fixing\u2026' : loadingQuery ? 'Running\u2026' : 'Run Query \u2192'}
+                  </button>
+                  {fixStatus === 'fixed' && (
+                    <span className="badge badge-green" title="Query had an SQL error and was automatically corrected">Auto-fixed \u2713</span>
+                  )}
+                  {results && (
+                    <>
+                      <button className={`btn ${chartType === 'table' ? 'btn-primary' : ''}`} onClick={() => setChartType('table')}>Table</button>
+                      <button className={`btn ${chartType === 'bar' ? 'btn-primary' : ''}`} onClick={() => setChartType('bar')}>Bar Chart</button>
+                      <button className={`btn ${chartType === 'line' ? 'btn-primary' : ''}`} onClick={() => setChartType('line')}>Line Chart</button>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {error && <div className="error-box">Error: {error}</div>}
+
+          {results && chartType !== 'table' && (
+            <div className="chart-container" style={{marginTop:'16px'}}>
+              <div className="chart-canvas-wrap">
+                <canvas ref={chartRef}></canvas>
+              </div>
+            </div>
+          )}
+
+          {results && chartType === 'table' && (() => {
+            const cols = Object.keys(results[0] || {});
+            const CURRENCY_RE = /production|total|fee|amount|pay|collection|salary|cost|price|revenue|charge|income|labfee|writeoff|adjust|split|insurance/i;
+            // A column is currency if its name matches keywords OR its first value is a decimal number
+            const isCurrency = (col) => {
+              if (CURRENCY_RE.test(col)) return true;
+              const v = results[0]?.[col];
+              return v != null && !isNaN(parseFloat(v)) && String(v).includes('.');
+            };
+            const currencyCols = new Set(cols.filter(isCurrency));
+            return (
+              <div className="report-section" style={{marginTop:'16px'}}>
+                <div className="report-section-header">Results ({results.length} rows)</div>
+                <div style={{overflowX:'auto'}}>
+                  <table className="report-table">
+                    <thead>
+                      <tr>{cols.map(k => <th key={k} className={currencyCols.has(k) ? 'money' : ''}>{k}</th>)}</tr>
+                    </thead>
+                    <tbody>
+                      {results.map((row, i) => (
+                        <tr key={i}>
+                          {cols.map((k, j) => {
+                            const v = row[k];
+                            const display = v == null ? '' : currencyCols.has(k) ? fmt(v) : String(v);
+                            return <td key={j} className={currencyCols.has(k) ? 'money' : ''}>{display}</td>;
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      );
+    }
+
+    // ── ChartView ─────────────────────────────────────────────────────────────
+    // Returns array of 'YYYY-MM' strings covering every month from startDate to endDate (YYYY-MM-DD)
+    const getMonthsBetween = (startStr, endStr) => {
+      const [sy, sm] = startStr.split('-').map(Number);
+      const [ey, em] = endStr.split('-').map(Number);
+      const months = [];
+      let y = sy, m = sm;
+      while (y < ey || (y === ey && m <= em)) {
+        months.push(`${y}-${String(m).padStart(2, '0')}`);
+        if (++m > 12) { m = 1; y++; }
+      }
+      return months;
+    };
+
+    // Aggregate month-level data into quarter / semiannual / year buckets
+    const groupMonthData = (monthData, groupBy, type) => {
+      if (groupBy === 'month') return monthData;
+
+      const getKey = (yearMonth) => {
+        const [y, mo] = yearMonth.split('-').map(Number);
+        if (groupBy === 'quarter')    return `Q${Math.ceil(mo/3)} ${y}`;
+        if (groupBy === 'semiannual') return `H${mo <= 6 ? 1 : 2} ${y}`;
+        return `${y}`;
+      };
+
+      const buckets = {};
+      monthData.forEach(d => {
+        const key = getKey(d.month);
+        if (!buckets[key]) {
+          buckets[key] = type === 'production'
+            ? { label: key, gross: 0, net: 0 }
+            : { label: key, patient: 0, insurance: 0, total: 0 };
+        }
+        if (type === 'production') {
+          buckets[key].gross += d.gross;
+          buckets[key].net   += d.net;
+        } else {
+          buckets[key].patient   += d.patient;
+          buckets[key].insurance += d.insurance;
+          buckets[key].total     += d.total;
+        }
+      });
+      return Object.values(buckets);
+    };
+
+    function ChartView({ type }) {
+      const chartRef = React.useRef(null);
+      const chartInstance = React.useRef(null);
+      const [range, setRange] = React.useState(6);           // 6 | 12 | 'custom'
+      const [groupBy, setGroupBy] = React.useState('month'); // month | quarter | semiannual | year
+      const [customStart, setCustomStart] = React.useState('');
+      const [customEnd, setCustomEnd] = React.useState('');
+      const [showPicker, setShowPicker] = React.useState(false);
+      const [pendingStart, setPendingStart] = React.useState('');
+      const [pendingEnd, setPendingEnd] = React.useState('');
+      const [loading, setLoading] = React.useState(false);
+      const [error, setError] = React.useState(null);
+
+      // Default picker dates when opening
+      const openPicker = () => {
+        const now = new Date();
+        const defaultEnd = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+        const past = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+        const defaultStart = `${past.getFullYear()}-${String(past.getMonth()+1).padStart(2,'0')}-01`;
+        setPendingStart(customStart || defaultStart);
+        setPendingEnd(customEnd || defaultEnd);
+        setShowPicker(true);
+      };
+
+      const applyCustom = () => {
+        if (!pendingStart || !pendingEnd || pendingStart > pendingEnd) return;
+        setCustomStart(pendingStart);
+        setCustomEnd(pendingEnd);
+        setRange('custom');
+        setShowPicker(false);
+      };
+
+      React.useEffect(() => {
+        let cancelled = false;
+        const fetchData = async () => {
+          // Build month list
+          let months;
+          if (range === 'custom') {
+            if (!customStart || !customEnd) return;
+            months = getMonthsBetween(customStart, customEnd);
+          } else {
+            const now = new Date();
+            months = [];
+            for (let i = range - 1; i >= 0; i--) {
+              const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+              months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+            }
+          }
+
+          setLoading(true);
+          setError(null);
+          try {
+            const rawMonthData = await Promise.all(months.map(async (m) => {
+              const { startDate, endDate } = getMonthRange(m);
+              if (type === 'production') {
+                const [prod, adj, wo] = await Promise.all([
+                  runQuery(`SELECT SUM(pl.ProcFee*(pl.UnitQty+pl.BaseUnits)) AS gross FROM procedurelog pl WHERE pl.ProcDate BETWEEN '${startDate}' AND '${endDate}' AND pl.ProcStatus=2`),
+                  runQuery(`SELECT SUM(AdjAmt) as totaladj FROM adjustment WHERE AdjDate BETWEEN '${startDate}' AND '${endDate}'`),
+                  runQuery(`SELECT SUM(-cp.Writeoff) AS totalw FROM claimproc cp WHERE cp.status IN (1,4,5,7) AND cp.DateCp BETWEEN '${startDate}' AND '${endDate}'`),
+                ]);
+                const gross = parseFloat(prod[0]?.gross || 0);
+                const net = gross + parseFloat(adj[0]?.totaladj || 0) + parseFloat(wo[0]?.totalw || 0);
+                return { month: m, gross, net };
+              } else {
+                const [pat, ins] = await Promise.all([
+                  runQuery(`SELECT SUM(ps.SplitAmt) AS pattotal FROM paysplit ps WHERE ps.DatePay BETWEEN '${startDate}' AND '${endDate}'`),
+                  runQuery(`SELECT SUM(cp.InsPayAmt) AS instotal FROM claimpayment cy INNER JOIN claimproc cp ON cp.ClaimPaymentNum=cy.ClaimPaymentNum WHERE cy.CheckDate BETWEEN '${startDate}' AND '${endDate}'`),
+                ]);
+                const patient = parseFloat(pat[0]?.pattotal || 0);
+                const insurance = parseFloat(ins[0]?.instotal || 0);
+                return { month: m, patient, insurance, total: patient + insurance };
+              }
+            }));
+
+            if (cancelled) return;
+            if (chartInstance.current) chartInstance.current.destroy();
+
+            // Apply grouping
+            const points = groupMonthData(rawMonthData, groupBy, type);
+            const getLabel = (d) => d.label || fmtMonth(d.month);
+
+            let datasets;
+            if (type === 'production') {
+              datasets = [
+                { label: 'Gross Production',  data: points.map(d => d.gross), borderColor: '#18BFFF', backgroundColor: 'rgba(24,191,255,0.1)', tension: 0.3, fill: false, borderWidth: 2, pointRadius: 4 },
+                { label: 'Net Production',    data: points.map(d => d.net),   borderColor: '#22C55E', backgroundColor: 'rgba(34,197,94,0.1)',   tension: 0.3, fill: false, borderWidth: 2, pointRadius: 4 },
+                { label: `Breakeven ($${({'month':185,'quarter':555,'semiannual':1110,'year':2220}[groupBy])}k)`, data: points.map(() => 185000 * {'month':1,'quarter':3,'semiannual':6,'year':12}[groupBy]), borderColor: '#EF4444', borderDash: [6,3], pointRadius: 0, fill: false, borderWidth: 2 },
+              ];
+            } else {
+              datasets = [
+                { label: 'Insurance Collections', data: points.map(d => d.insurance), borderColor: '#18BFFF', backgroundColor: 'rgba(24,191,255,0.1)', tension: 0.3, fill: true, borderWidth: 2, pointRadius: 4 },
+                { label: 'Patient Collections',   data: points.map(d => d.patient),   borderColor: '#FCB400', backgroundColor: 'rgba(252,180,0,0.1)',    tension: 0.3, fill: true, borderWidth: 2, pointRadius: 4 },
+              ];
+            }
+
+            chartInstance.current = new Chart(chartRef.current, {
+              type: 'line',
+              data: { labels: points.map(getLabel), datasets },
+              options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { position: 'top' } },
+                scales: { y: { ticks: { callback: (v) => '$' + (v/1000).toFixed(0) + 'k' } } }
+              }
+            });
+          } catch (e) {
+            if (!cancelled) setError(e.message);
+          } finally {
+            if (!cancelled) setLoading(false);
+          }
+        };
+        fetchData();
+        return () => {
+          cancelled = true;
+          if (chartInstance.current) { chartInstance.current.destroy(); chartInstance.current = null; }
+        };
+      }, [type, range, groupBy, customStart, customEnd]);
+
+      // Custom range label
+      const customLabel = customStart && customEnd
+        ? `${customStart} – ${customEnd}`
+        : 'Custom';
+
+      return (
+        <div className="chart-container">
+          <div className="chart-header">
+            <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
+              <span className="chart-title">{type === 'production' ? 'Production Trends' : 'Collections Trends'}</span>
+              <label style={{display:'flex',alignItems:'center',gap:'6px',fontSize:'13px',color:'var(--text-muted)',fontWeight:500}}>
+                By:
+                <select className="month-select" style={{fontSize:'13px',padding:'4px 8px'}}
+                  value={groupBy} onChange={e => setGroupBy(e.target.value)}>
+                  <option value="month">Month</option>
+                  <option value="quarter">Quarter</option>
+                  <option value="semiannual">Semiannual</option>
+                  <option value="year">Year</option>
+                </select>
+              </label>
+            </div>
+            <div className="chart-controls">
+              <button className={`btn ${range === 6 ? 'btn-primary' : ''}`} onClick={() => setRange(6)}>6 mo</button>
+              <button className={`btn ${range === 12 ? 'btn-primary' : ''}`} onClick={() => setRange(12)}>12 mo</button>
+              <button className={`btn ${range === 'custom' ? 'btn-primary' : ''}`} onClick={openPicker}>
+                {range === 'custom' ? customLabel : 'Custom Range\u2026'}
+              </button>
+            </div>
+          </div>
+
+          {showPicker && (
+            <div className="picker-overlay" onClick={e => { if (e.target === e.currentTarget) setShowPicker(false); }}>
+              <div className="picker-modal">
+                <h3>Custom Date Range</h3>
+                <div className="picker-field">
+                  <label>Start Date</label>
+                  <input type="date" value={pendingStart} onChange={e => setPendingStart(e.target.value)} />
+                </div>
+                <div className="picker-field">
+                  <label>End Date</label>
+                  <input type="date" value={pendingEnd} onChange={e => setPendingEnd(e.target.value)}
+                    min={pendingStart} />
+                </div>
+                {pendingStart && pendingEnd && pendingStart > pendingEnd && (
+                  <div style={{color:'#dc2626',fontSize:13,marginTop:-8,marginBottom:8}}>End date must be after start date.</div>
+                )}
+                <div className="picker-actions">
+                  <button className="btn" onClick={() => setShowPicker(false)}>Cancel</button>
+                  <button className="btn btn-primary" onClick={applyCustom}
+                    disabled={!pendingStart || !pendingEnd || pendingStart > pendingEnd}>
+                    Apply
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {loading && <div className="loading"><span className="spinner"></span> Loading chart data...</div>}
+          {error && <div className="error-box">{error}</div>}
+          <div className="chart-canvas-wrap" style={{display: loading ? 'none' : 'block'}}>
+            <canvas ref={chartRef}></canvas>
+          </div>
+        </div>
+      );
+    }
+
+    // ── MonthNav ──────────────────────────────────────────────────────────────
+    const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+    function MonthNav({ month, onChange }) {
+      const [yearNum, monthNum] = month.split('-').map(Number);
+      const [editingYear, setEditingYear] = React.useState(false);
+      const [yearInput, setYearInput] = React.useState(String(yearNum));
+      const yearRef = React.useRef(null);
+
+      React.useEffect(() => {
+        if (editingYear && yearRef.current) yearRef.current.select();
+      }, [editingYear]);
+
+      // Keep yearInput in sync if month prop changes externally (prev/next buttons)
+      React.useEffect(() => {
+        if (!editingYear) setYearInput(String(yearNum));
+      }, [yearNum, editingYear]);
+
+      const commitYear = () => {
+        const y = parseInt(yearInput, 10);
+        if (y >= 2000 && y <= 2099) {
+          onChange(`${y}-${String(monthNum).padStart(2, '0')}`);
+        }
+        setEditingYear(false);
+      };
+
+      return (
+        <div className="month-nav">
+          <button className="btn btn-icon" onClick={() => onChange(addMonth(month, -1))}>{'\u2039'}</button>
+
+          <select className="month-select" value={monthNum}
+            onChange={e => onChange(`${yearNum}-${String(e.target.value).padStart(2,'0')}`)}>
+            {MONTH_NAMES.map((name, i) => (
+              <option key={i} value={i + 1}>{name}</option>
+            ))}
+          </select>
+
+          {editingYear ? (
+            <input ref={yearRef} className="year-input" type="number"
+              value={yearInput}
+              onChange={e => setYearInput(e.target.value)}
+              onBlur={commitYear}
+              onKeyDown={e => { if (e.key === 'Enter') commitYear(); if (e.key === 'Escape') setEditingYear(false); }}
+            />
+          ) : (
+            <span className="year-label" title="Click to edit year"
+              onClick={() => { setYearInput(String(yearNum)); setEditingYear(true); }}>
+              {yearNum}
+            </span>
+          )}
+
+          <button className="btn btn-icon" onClick={() => onChange(addMonth(month, 1))}>{'\u203A'}</button>
+        </div>
+      );
+    }
+
+    // ── App ───────────────────────────────────────────────────────────────────
+    function App() {
+      const [activeView, setActiveView] = React.useState('monthly');
+
+      const getInitialMonth = () => {
+        const params = new URLSearchParams(window.location.search);
+        const m = params.get('month');
+        if (m && /^\d{4}-\d{2}$/.test(m)) return m;
+        const now = new Date();
+        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      };
+
+      const [month, setMonth] = React.useState(getInitialMonth);
+
+      const handleMonthChange = (newMonth) => {
+        setMonth(newMonth);
+        window.history.replaceState(null, '', `?month=${newMonth}`);
+      };
+
+      const renderContent = () => {
+        if (activeView === 'monthly') return <MonthlyStats month={month} />;
+        if (activeView === 'assoclabs') return <AssocLabs month={month} />;
+        if (activeView === 'ai-query') return <AIQuery month={month} />;
+        if (activeView === 'prod-trends') return <ChartView type="production" />;
+        if (activeView === 'coll-trends') return <ChartView type="collections" />;
+        return null;
+      };
+
+      const showMonthNav = ['monthly', 'assoclabs'].includes(activeView);
+
+      const headerTitle = activeView === 'ai-query' ? 'AI Query Builder'
+        : activeView === 'prod-trends' ? 'Production Trends'
+        : activeView === 'coll-trends' ? 'Collections Trends'
+        : '';
+
+      return (
+        <div className="layout">
+          <Sidebar activeView={activeView} onNavigate={setActiveView} />
+          <div className="main">
+            <div className="header">
+              <div>
+                {showMonthNav ? (
+                  <MonthNav month={month} onChange={handleMonthChange} />
+                ) : (
+                  <span style={{fontSize:'16px',fontWeight:600}}>{headerTitle}</span>
+                )}
+              </div>
+              <div style={{display:'flex',gap:'8px'}}>
+                {showMonthNav && (
+                  <button className="btn" onClick={() => {
+                    const now = new Date();
+                    handleMonthChange(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
+                  }}>Today</button>
+                )}
+              </div>
+            </div>
+            <div className="content">
+              {renderContent()}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ── Mount ─────────────────────────────────────────────────────────────────
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
