@@ -1,0 +1,20 @@
+{
+  "name": "Dental Reports",
+  "id": "dental-reports",
+  "description": "Reports from OpenDental data",
+  "agent": "percy",
+  "agent_config": "~/.openclaw/agents/percy/agent.md",
+  "source_language": "python",
+  "default_model": "claude-sonnet-4-6",
+  "repo": "ssh://jkoops@jkoops.com/~/git/dental-reports.git",
+  "production": {
+    "host": null,
+    "path": null,
+    "deploy_method": null
+  },
+  "backup": {
+    "location": null,
+    "method": null
+  },
+  "primary_machine": "bea-jed-pc"
+}
