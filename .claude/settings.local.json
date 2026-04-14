@@ -1,7 +1,24 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" https://github.com/jedkoopsclaude/dental-reports)",
+      "Bash(ls -la ~/.claude/*.json)",
+      "Bash(xargs cat:*)",
+      "Bash(find ~/.claude/projects -type f -name \"*.meta.json\" -exec cat {} \\\\;)",
+      "Bash(find ~/.claude -type f \\\\\\( -name \"*.json\" -o -name \"*.md\" \\\\\\) -exec grep -l \"clone\\\\|remote\\\\|repository\\\\|git.*url\" {} \\\\;)",
+      "Bash(awk '{print $NF}')",
+      "Bash(xargs -I {} dirname {})",
+      "Bash(grep -E \"\\\\.md$|\\\\.json$\")",
+      "Bash(config)",
+      "Bash(remote)",
+      "Bash(task\")",
+      "Bash(xargs grep:*)",
+      "Bash(find:*)",
+      "Bash(gh repo:*)",
+      "Bash(gh api:*)",
+      "Bash(claude api:*)",
+      "WebFetch(domain:docs.anthropic.com)"
     ]
   }
 }
