@@ -541,23 +541,6 @@
 
       return (
         <div style={{maxWidth:'700px'}}>
-          {/* COMPENSATION SUMMARY */}
-          <div className="report-section">
-            <div className="report-section-header">Compensation Summary</div>
-            <table className="report-table">
-              <thead>
-                <tr><th>Item</th><th className="money">Amount</th></tr>
-              </thead>
-              <tbody>
-                <tr><td>Dr. Thanh's Collections</td><td className="money">{fmt(d.assocTotal)}</td></tr>
-                <tr><td>35% Compensation</td><td className="money">{fmt(d.compensation)}</td></tr>
-                <tr><td>Lab Fees Total</td><td className="money">{fmt(d.totalLabFees)}</td></tr>
-                <tr><td>30% Lab Fee Share</td><td className="money">-{fmt(d.labFeeShare)}</td></tr>
-                <tr className="total"><td>Paycheck</td><td className="money">{fmt(d.paycheck)}</td></tr>
-              </tbody>
-            </table>
-          </div>
-
           {/* LAB CASE DETAILS */}
           <div className="report-section">
             <div className="report-section-header">Lab Case Details</div>
