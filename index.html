@@ -850,13 +850,9 @@
       return Object.values(buckets);
     };
 
-    function ChartView({ type }) {
+    function ChartView({ type, range, groupBy, customStart, customEnd, onRangeChange, onGroupByChange, onCustomRangeChange }) {
       const chartRef = React.useRef(null);
       const chartInstance = React.useRef(null);
-      const [range, setRange] = React.useState(6);           // 6 | 12 | 'custom'
-      const [groupBy, setGroupBy] = React.useState('month'); // month | quarter | semiannual | year
-      const [customStart, setCustomStart] = React.useState('');
-      const [customEnd, setCustomEnd] = React.useState('');
       const [showPicker, setShowPicker] = React.useState(false);
       const [pendingStart, setPendingStart] = React.useState('');
       const [pendingEnd, setPendingEnd] = React.useState('');
