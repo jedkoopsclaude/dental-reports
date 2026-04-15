@@ -315,8 +315,8 @@
             if (cancelled) return;
 
             // Production calculations
-            const restorative = prodRows.filter(r => r.isHygienist == 0);
-            const hygiene = prodRows.filter(r => r.isHygienist == 1);
+            const restorative = prodRows.filter(r => r.isHygienist == 0 && parseFloat(r.fees || 0) !== 0);
+            const hygiene = prodRows.filter(r => r.isHygienist == 1 && parseFloat(r.fees || 0) !== 0);
             const restTotal = restorative.reduce((sum, r) => sum + parseFloat(r.fees || 0), 0);
             const hygTotal = hygiene.reduce((sum, r) => sum + parseFloat(r.fees || 0), 0);
             const grandTotal = restTotal + hygTotal;
