@@ -1646,9 +1646,7 @@
                   title={isAdmin ? 'Admin mode active (click to lock)' : 'Admin login'}
                   onClick={() => {
                     if (isAdmin) { setIsAdmin(false); return; }
-                    const pw = prompt('Enter admin password:');
-                    if (pw && pw === ADMIN_PASSWORD) setIsAdmin(true);
-                    else if (pw != null) alert('Incorrect password.');
+                    setAdminPw(''); setAdminError(false); setShowAdminPrompt(true);
                   }}>{isAdmin ? '\u{1F513}' : '\u{1F512}'}</button>
               </div>
             </div>
