@@ -1171,7 +1171,7 @@
     }
 
     // ── HourlyChartView ──────────────────────────────────────────────────────
-    function HourlyChartView({ type, range, groupBy, customStart, customEnd, onRangeChange, onGroupByChange, onCustomRangeChange }) {
+    function HourlyChartView({ type, range, groupBy, customStart, customEnd, onRangeChange, onGroupByChange, onCustomRangeChange, isAdmin }) {
       const chartRef = React.useRef(null);
       const chartInstance = React.useRef(null);
       const [showPicker, setShowPicker] = React.useState(false);
