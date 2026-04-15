@@ -140,6 +140,23 @@
       .monthly-left { width: 480px; min-width: 480px; }
       .report-section { box-shadow: none; border: 1px solid #ccc; page-break-inside: avoid; }
     }
+
+    .hours-manager-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100; display: flex; align-items: center; justify-content: center; }
+    .hours-manager-modal { background: var(--bg); border-radius: 12px; padding: 28px; width: 700px; max-height: 80vh; overflow-y: auto; box-shadow: 0 8px 32px rgba(0,0,0,0.18); }
+    .hours-manager-modal h3 { font-size: 15px; font-weight: 600; margin-bottom: 20px; }
+    .hours-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .hours-table th { text-align: left; padding: 8px 12px; font-size: 11px; font-weight: 600; color: var(--text-muted); background: var(--surface); border-bottom: 1px solid var(--border); text-transform: uppercase; letter-spacing: 0.04em; }
+    .hours-table td { padding: 8px 12px; border-bottom: 1px solid var(--border); }
+    .hours-table tr:last-child td { border-bottom: none; }
+    .hours-table .hours-override { background: #fefce8; }
+    .hours-table input[type="number"] { width: 80px; padding: 4px 8px; border: 1px solid var(--border); border-radius: var(--radius); font-family: var(--font); font-size: 13px; outline: none; }
+    .hours-table input[type="number"]:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(24,191,255,0.15); }
+    .manage-hours-btn { padding: 6px 14px; border-radius: var(--radius); border: 1px solid var(--primary); background: transparent; color: var(--primary); cursor: pointer; font-size: 13px; font-family: var(--font); font-weight: 500; transition: all 0.15s; }
+    .manage-hours-btn:hover { background: var(--primary); color: white; }
+    .hours-manager-controls { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+    .hours-manager-controls label { font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    .hours-manager-controls select, .hours-manager-controls input[type="date"] { padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius); font-family: var(--font); font-size: 13px; outline: none; }
+    .hours-manager-controls select:focus, .hours-manager-controls input[type="date"]:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(24,191,255,0.15); }
   </style>
 </head>
 <body>
