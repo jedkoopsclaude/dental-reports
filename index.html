@@ -1286,13 +1286,13 @@
             // Build provider list (exclude hidden providers)
             const provMap = {};
             hoursRows.forEach(r => {
-              if (HIDDEN_PROVIDERS.includes(r.provName)) return;
+              if (isHiddenProvider(r.provName)) return;
               if (!provMap[r.ProvNum]) provMap[r.ProvNum] = { provNum: r.ProvNum, provName: r.provName };
             });
             // Also add providers from amount data that may not appear in hours
             if (type === 'production') {
               amountRows.forEach(r => {
-                if (HIDDEN_PROVIDERS.includes(r.provName)) return;
+                if (isHiddenProvider(r.provName)) return;
                 if (!provMap[r.ProvNum]) provMap[r.ProvNum] = { provNum: r.ProvNum, provName: r.provName || `Provider ${r.ProvNum}` };
               });
             }
@@ -1306,7 +1306,7 @@
             // Build hours lookup: provNum -> date -> effective hours
             const hoursLookup = {};
             hoursRows.forEach(r => {
-              if (HIDDEN_PROVIDERS.includes(r.provName)) return;
+              if (isHiddenProvider(r.provName)) return;
               const date = r.clinical_day?.split('T')[0] || r.clinical_day;
               const key = `${r.ProvNum}:${date}`;
               const effectiveHours = overridesData[key] != null ? overridesData[key] : parseFloat(r.auto_hours || 0);
