@@ -1569,6 +1569,28 @@
 
       const [month, setMonth] = React.useState(getInitialMonth);
 
+      // Lifted chart range state — shared across all chart views
+      const [chartRange, setChartRange] = React.useState(6);
+      const [chartGroupBy, setChartGroupBy] = React.useState('month');
+      const [chartCustomStart, setChartCustomStart] = React.useState('');
+      const [chartCustomEnd, setChartCustomEnd] = React.useState('');
+
+      const handleChartCustomRange = (start, end) => {
+        setChartCustomStart(start);
+        setChartCustomEnd(end);
+        setChartRange('custom');
+      };
+
+      const chartRangeProps = {
+        range: chartRange,
+        groupBy: chartGroupBy,
+        customStart: chartCustomStart,
+        customEnd: chartCustomEnd,
+        onRangeChange: setChartRange,
+        onGroupByChange: setChartGroupBy,
+        onCustomRangeChange: handleChartCustomRange,
+      };
+
       const handleMonthChange = (newMonth) => {
         setMonth(newMonth);
         window.history.replaceState(null, '', `?month=${newMonth}`);
@@ -1578,8 +1600,10 @@
         if (activeView === 'monthly') return <MonthlyStats month={month} />;
         if (activeView === 'assoclabs') return <AssocLabs month={month} />;
         if (activeView === 'ai-query') return <AIQuery month={month} />;
-        if (activeView === 'prod-trends') return <ChartView type="production" />;
-        if (activeView === 'coll-trends') return <ChartView type="collections" />;
+        if (activeView === 'prod-trends') return <ChartView type="production" {...chartRangeProps} />;
+        if (activeView === 'coll-trends') return <ChartView type="collections" {...chartRangeProps} />;
+        if (activeView === 'hourly-prod') return <HourlyChartView type="production" {...chartRangeProps} />;
+        if (activeView === 'hourly-coll') return <HourlyChartView type="collections" {...chartRangeProps} />;
         return null;
       };
 
@@ -1588,6 +1612,8 @@
       const headerTitle = activeView === 'ai-query' ? 'AI Query Builder'
         : activeView === 'prod-trends' ? 'Production Trends'
         : activeView === 'coll-trends' ? 'Collections Trends'
+        : activeView === 'hourly-prod' ? 'Hourly Production'
+        : activeView === 'hourly-coll' ? 'Hourly Collections'
         : '';
 
       return (
