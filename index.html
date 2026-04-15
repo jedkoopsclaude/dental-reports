@@ -1590,8 +1590,8 @@
         if (activeView === 'ai-query') return <AIQuery month={month} />;
         if (activeView === 'prod-trends') return <ChartView type="production" {...chartRangeProps} />;
         if (activeView === 'coll-trends') return <ChartView type="collections" {...chartRangeProps} />;
-        if (activeView === 'hourly-prod') return <HourlyChartView type="production" {...chartRangeProps} />;
-        if (activeView === 'hourly-coll') return <HourlyChartView type="collections" {...chartRangeProps} />;
+        if (activeView === 'hourly-prod') return <HourlyChartView type="production" isAdmin={isAdmin} {...chartRangeProps} />;
+        if (activeView === 'hourly-coll') return <HourlyChartView type="collections" isAdmin={isAdmin} {...chartRangeProps} />;
         return null;
       };
 
