@@ -974,7 +974,7 @@
               <label style={{display:'flex',alignItems:'center',gap:'6px',fontSize:'13px',color:'var(--text-muted)',fontWeight:500}}>
                 By:
                 <select className="month-select" style={{fontSize:'13px',padding:'4px 8px'}}
-                  value={groupBy} onChange={e => setGroupBy(e.target.value)}>
+                  value={groupBy} onChange={e => onGroupByChange(e.target.value)}>
                   <option value="month">Month</option>
                   <option value="quarter">Quarter</option>
                   <option value="semiannual">Semiannual</option>
