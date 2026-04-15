@@ -1275,16 +1275,16 @@
 
             if (cancelled) return;
 
-            // Build provider list (non-hygienist only)
+            // Build provider list (exclude hidden providers)
             const provMap = {};
             hoursRows.forEach(r => {
-              if (r.isHygienist == 1) return;
+              if (HIDDEN_PROVIDERS.includes(r.provName)) return;
               if (!provMap[r.ProvNum]) provMap[r.ProvNum] = { provNum: r.ProvNum, provName: r.provName };
             });
             // Also add providers from amount data that may not appear in hours
             if (type === 'production') {
               amountRows.forEach(r => {
-                if (r.isHygienist == 1) return;
+                if (HIDDEN_PROVIDERS.includes(r.provName)) return;
                 if (!provMap[r.ProvNum]) provMap[r.ProvNum] = { provNum: r.ProvNum, provName: r.provName || `Provider ${r.ProvNum}` };
               });
             }
