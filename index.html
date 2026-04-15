@@ -1541,8 +1541,11 @@
     }
 
     // ── App ───────────────────────────────────────────────────────────────────
+    const ADMIN_PASSWORD = 'orangeplace';
+
     function App() {
       const [activeView, setActiveView] = React.useState('monthly');
+      const [isAdmin, setIsAdmin] = React.useState(false);
 
       const getInitialMonth = () => {
         const params = new URLSearchParams(window.location.search);
