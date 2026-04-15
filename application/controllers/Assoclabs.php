@@ -74,20 +74,6 @@ class Assoclabs extends CI_Controller {
 			$labhtml .= "</div>";
 			$totalFees += $row->LabFee;
 		}
-		$labTotal = '$'.number_format( $totalFees, 2);
-		$twenty5 = $totalFees * 0.30;
-		$labPercent = '$'.number_format( $twenty5 , 2);
-		$html .= "<div id='labtotal'><span class='provname'>Lab Fees:</span><span class='accounting'>$labTotal</span></div>";
-		$html .= "<div id='lab25'><span class='provname'>30%:</span><span class='accounting'>$labPercent</span></div>";
-
-		// Now calculate Associate's paycheck
-		$roundedThirty3 = round( $thirtythree , 2);
-		$roundedTwenty5 = round( $twenty5 , 2 );
-		$jerryCheck = $roundedThirty3 - $roundedTwenty5;
-		//$jerryCheck = $thirtythree - $twenty5;
-		$prettyCheck = '$'.number_format( $jerryCheck , 2);
-		$html .= "<div id='jerrycheck'><span class='provname'>Paycheck:</span><span class='accounting'>$prettyCheck</span></div>";
-
 		// Now list lab details
 		$html .= $labhtml;
 
