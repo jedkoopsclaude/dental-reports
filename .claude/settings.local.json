@@ -20,5 +20,8 @@
       "Bash(claude api:*)",
       "WebFetch(domain:docs.anthropic.com)"
     ]
+  },
+  "remote": {
+    "defaultEnvironmentId": "env_01YaFrRV74uepBBWCLmj32wF"
   }
 }
