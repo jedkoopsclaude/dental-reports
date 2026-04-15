@@ -1101,12 +1101,14 @@
                   ))}
                 </select>
               </label>
-              <label style={{marginLeft:'auto'}}>From:
-                <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{marginLeft:6}} />
-              </label>
-              <label>To:
-                <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{marginLeft:6}} />
-              </label>
+              <div style={{marginLeft:'auto',display:'flex',flexDirection:'column',gap:8,alignItems:'flex-end'}}>
+                <label>From:
+                  <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{marginLeft:6}} />
+                </label>
+                <label>To:
+                  <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{marginLeft:6}} />
+                </label>
+              </div>
             </div>
 
             {loading ? (
