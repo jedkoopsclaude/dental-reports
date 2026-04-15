@@ -217,8 +217,13 @@
     const PROV_SARAH = 219;
     const PROV_BEN = 221;
     const CROWN_CODES = "'D2740','D6058','D6740','D6245','D6548'";
-    const HIDDEN_PROVIDERS = ['New Patient', 'Orange Place Family Dentistry', 'Temp Hygienist'];
+    const HIDDEN_PROVIDERS = ['new patient', 'orange place family dentistry', 'temp hygienist', 'temp'];
     const PROVIDER_ORDER = ['Jed Koops', 'Thanh Mollica', 'Melanie Lemieux', 'Sarah Johnston', 'Benn Gibbs', 'Janet Kerman'];
+    const isHiddenProvider = (name) => HIDDEN_PROVIDERS.includes((name || '').trim().toLowerCase());
+    const provSortIndex = (name) => {
+      const idx = PROVIDER_ORDER.findIndex(p => p.toLowerCase() === (name || '').trim().toLowerCase());
+      return idx === -1 ? 999 : idx;
+    };
 
     const REPORTS = [
       { id: 'monthly', name: 'Monthly Stats', icon: '\u{1F4CA}' },
