@@ -983,8 +983,8 @@
               </label>
             </div>
             <div className="chart-controls">
-              <button className={`btn ${range === 6 ? 'btn-primary' : ''}`} onClick={() => setRange(6)}>6 mo</button>
-              <button className={`btn ${range === 12 ? 'btn-primary' : ''}`} onClick={() => setRange(12)}>12 mo</button>
+              <button className={`btn ${range === 6 ? 'btn-primary' : ''}`} onClick={() => onRangeChange(6)}>6 mo</button>
+              <button className={`btn ${range === 12 ? 'btn-primary' : ''}`} onClick={() => onRangeChange(12)}>12 mo</button>
               <button className={`btn ${range === 'custom' ? 'btn-primary' : ''}`} onClick={openPicker}>
                 {range === 'custom' ? customLabel : 'Custom Range\u2026'}
               </button>
