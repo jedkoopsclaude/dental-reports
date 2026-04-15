@@ -1546,6 +1546,25 @@
     function App() {
       const [activeView, setActiveView] = React.useState('monthly');
       const [isAdmin, setIsAdmin] = React.useState(false);
+      const [showAdminPrompt, setShowAdminPrompt] = React.useState(false);
+      const [adminPw, setAdminPw] = React.useState('');
+      const [adminError, setAdminError] = React.useState(false);
+      const adminInputRef = React.useRef(null);
+
+      React.useEffect(() => {
+        if (showAdminPrompt && adminInputRef.current) adminInputRef.current.focus();
+      }, [showAdminPrompt]);
+
+      const handleAdminSubmit = () => {
+        if (adminPw === ADMIN_PASSWORD) {
+          setIsAdmin(true);
+          setShowAdminPrompt(false);
+          setAdminPw('');
+          setAdminError(false);
+        } else {
+          setAdminError(true);
+        }
+      };
 
       const getInitialMonth = () => {
         const params = new URLSearchParams(window.location.search);
