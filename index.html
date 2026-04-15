@@ -1427,9 +1427,9 @@
                     <option value="year">Year</option>
                   </select>
                 </label>
-                <button className="manage-hours-btn" onClick={() => setShowHoursManager(true)}>
+                {isAdmin && <button className="manage-hours-btn" onClick={() => setShowHoursManager(true)}>
                   Manage Hours
-                </button>
+                </button>}
               </div>
               <div className="chart-controls">
                 <button className={`btn ${range === 6 ? 'btn-primary' : ''}`} onClick={() => onRangeChange(6)}>6 mo</button>
