@@ -59,6 +59,7 @@ class Monthly extends CI_Controller {
 		$restorativeTotal = 0;
 		foreach ($providers as $row)
 		{
+			if ($row->fees == 0) continue;
 			$total = '$'.number_format($row->fees, 2);
 			$line = "<div class='row'><span class='provname'>".$row->provName.":</span> <span class='accounting'>$total</span></div>";
 			if ($row->isHygienist == 0)
