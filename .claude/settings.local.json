@@ -18,7 +18,12 @@
       "Bash(gh repo:*)",
       "Bash(gh api:*)",
       "Bash(claude api:*)",
-      "WebFetch(domain:docs.anthropic.com)"
+      "WebFetch(domain:docs.anthropic.com)",
+      "Bash(node -e \"try { require\\('./server.js'\\); } catch\\(e\\) { if \\(e.code === 'MODULE_NOT_FOUND'\\) console.log\\('Missing dep:', e.message\\); else if \\(e.message.includes\\('EADDRINUSE'\\)\\) console.log\\('Syntax OK \\(port in use\\)'\\); else console.log\\('Error:', e.message\\); }\")",
+      "Bash(npx kill-port *)",
+      "Bash(node server.js)",
+      "Bash(curl -s http://localhost:3000/api/hours-overrides)",
+      "Bash(curl *)"
     ]
   },
   "remote": {
