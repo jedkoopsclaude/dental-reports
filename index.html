@@ -1616,13 +1616,21 @@
                   <span style={{fontSize:'16px',fontWeight:600}}>{headerTitle}</span>
                 )}
               </div>
-              <div style={{display:'flex',gap:'8px'}}>
+              <div style={{display:'flex',gap:'8px',alignItems:'center'}}>
                 {showMonthNav && (
                   <button className="btn" onClick={() => {
                     const now = new Date();
                     handleMonthChange(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
                   }}>Today</button>
                 )}
+                <button className="btn" style={{fontSize:16,padding:'4px 8px',opacity: isAdmin ? 1 : 0.4}}
+                  title={isAdmin ? 'Admin mode active (click to lock)' : 'Admin login'}
+                  onClick={() => {
+                    if (isAdmin) { setIsAdmin(false); return; }
+                    const pw = prompt('Enter admin password:');
+                    if (pw && pw === ADMIN_PASSWORD) setIsAdmin(true);
+                    else if (pw != null) alert('Incorrect password.');
+                  }}>{isAdmin ? '\u{1F513}' : '\u{1F512}'}</button>
               </div>
             </div>
             <div className="content">
