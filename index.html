@@ -1027,6 +1027,478 @@
       );
     }
 
+    // ── ProviderHoursManager ────────────────────────────────────────────────
+    function ProviderHoursManager({ providers, onClose, onSaved }) {
+      const [selectedProv, setSelectedProv] = React.useState(providers[0]?.provNum || '');
+      const [startDate, setStartDate] = React.useState(() => {
+        const d = new Date(); d.setMonth(d.getMonth() - 3);
+        return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`;
+      });
+      const [endDate, setEndDate] = React.useState(() => {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      });
+      const [rows, setRows] = React.useState([]);
+      const [overrides, setOverrides] = React.useState({});
+      const [loading, setLoading] = React.useState(false);
+      const [saving, setSaving] = React.useState(null); // date being saved
+      const [dirty, setDirty] = React.useState(false);
+
+      const loadData = React.useCallback(async () => {
+        if (!selectedProv) return;
+        setLoading(true);
+        try {
+          const [hoursRows, ovRes] = await Promise.all([
+            runQuery(`SELECT pl.ProvNum, DATE(apt.AptDateTime) as clinical_day,
+              TIMESTAMPDIFF(MINUTE,
+                MIN(apt.AptDateTime),
+                MAX(DATE_ADD(apt.AptDateTime, INTERVAL (CHAR_LENGTH(apt.Pattern)*5) MINUTE))
+              ) / 60.0 as auto_hours
+              FROM appointment apt
+              INNER JOIN procedurelog pl ON pl.AptNum = apt.AptNum
+              LEFT JOIN provider pr ON pl.ProvNum = pr.ProvNum
+              WHERE pl.ProcStatus = 2 AND apt.AptStatus = 2
+                AND pl.ProvNum = ${selectedProv}
+                AND DATE(apt.AptDateTime) BETWEEN '${startDate}' AND '${endDate}'
+              GROUP BY pl.ProvNum, DATE(apt.AptDateTime)
+              ORDER BY clinical_day`),
+            fetch(`/api/hours-overrides?provNum=${selectedProv}`).then(r => r.json()),
+          ]);
+          setRows(hoursRows);
+          setOverrides(ovRes);
+        } catch (e) {
+          console.error('Failed to load hours data:', e);
+        } finally {
+          setLoading(false);
+        }
+      }, [selectedProv, startDate, endDate]);
+
+      React.useEffect(() => { loadData(); }, [loadData]);
+
+      const handleSave = async (date, hours) => {
+        setSaving(date);
+        try {
+          await fetch('/api/hours-overrides', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ provNum: selectedProv, date, hours: parseFloat(hours) }),
+          });
+          setDirty(true);
+          await loadData();
+        } finally { setSaving(null); }
+      };
+
+      const handleDelete = async (date) => {
+        setSaving(date);
+        try {
+          await fetch('/api/hours-overrides', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ provNum: selectedProv, date }),
+          });
+          setDirty(true);
+          await loadData();
+        } finally { setSaving(null); }
+      };
+
+      const handleClose = () => {
+        if (dirty) onSaved();
+        onClose();
+      };
+
+      return (
+        <div className="hours-manager-overlay" onClick={e => { if (e.target === e.currentTarget) handleClose(); }}>
+          <div className="hours-manager-modal">
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+              <h3 style={{margin:0}}>Provider Hours Manager</h3>
+              <button className="btn" onClick={handleClose}>Close</button>
+            </div>
+
+            <div className="hours-manager-controls">
+              <label>Provider:
+                <select value={selectedProv} onChange={e => setSelectedProv(e.target.value)} style={{marginLeft:6}}>
+                  {providers.map(p => (
+                    <option key={p.provNum} value={p.provNum}>{p.provName}</option>
+                  ))}
+                </select>
+              </label>
+              <label>From:
+                <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{marginLeft:6}} />
+              </label>
+              <label>To:
+                <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{marginLeft:6}} />
+              </label>
+            </div>
+
+            {loading ? (
+              <div className="loading"><span className="spinner"></span> Loading hours...</div>
+            ) : rows.length === 0 ? (
+              <div style={{padding:20,color:'var(--text-muted)',textAlign:'center'}}>No clinical days found for this provider in the selected range.</div>
+            ) : (
+              <table className="hours-table">
+                <thead>
+                  <tr><th>Date</th><th>Auto Hours</th><th>Override</th><th>Actions</th></tr>
+                </thead>
+                <tbody>
+                  {rows.map(row => {
+                    const date = row.clinical_day?.split('T')[0] || row.clinical_day;
+                    const key = `${selectedProv}:${date}`;
+                    const hasOverride = overrides[key] != null;
+                    const autoH = parseFloat(row.auto_hours || 0).toFixed(2);
+                    return (
+                      <tr key={date} className={hasOverride ? 'hours-override' : ''}>
+                        <td>{date}</td>
+                        <td>{autoH}</td>
+                        <td>
+                          <input type="number" step="0.25" min="0" max="24"
+                            defaultValue={hasOverride ? overrides[key] : ''}
+                            placeholder="—"
+                            id={`ov-${date}`}
+                          />
+                        </td>
+                        <td style={{display:'flex',gap:4}}>
+                          <button className="btn" style={{padding:'3px 10px',fontSize:12}}
+                            disabled={saving === date}
+                            onClick={() => {
+                              const val = document.getElementById(`ov-${date}`).value;
+                              if (val !== '') handleSave(date, val);
+                            }}>
+                            {saving === date ? '...' : 'Save'}
+                          </button>
+                          {hasOverride && (
+                            <button className="btn" style={{padding:'3px 10px',fontSize:12,color:'var(--danger)'}}
+                              disabled={saving === date}
+                              onClick={() => handleDelete(date)}>
+                              Delete
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // ── HourlyChartView ──────────────────────────────────────────────────────
+    function HourlyChartView({ type, range, groupBy, customStart, customEnd, onRangeChange, onGroupByChange, onCustomRangeChange }) {
+      const chartRef = React.useRef(null);
+      const chartInstance = React.useRef(null);
+      const [showPicker, setShowPicker] = React.useState(false);
+      const [pendingStart, setPendingStart] = React.useState('');
+      const [pendingEnd, setPendingEnd] = React.useState('');
+      const [loading, setLoading] = React.useState(false);
+      const [error, setError] = React.useState(null);
+      const [showHoursManager, setShowHoursManager] = React.useState(false);
+      const [providers, setProviders] = React.useState([]);
+      const [refreshKey, setRefreshKey] = React.useState(0);
+
+      const openPicker = () => {
+        const now = new Date();
+        const defaultEnd = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+        const past = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+        const defaultStart = `${past.getFullYear()}-${String(past.getMonth()+1).padStart(2,'0')}-01`;
+        setPendingStart(customStart || defaultStart);
+        setPendingEnd(customEnd || defaultEnd);
+        setShowPicker(true);
+      };
+
+      const applyCustom = () => {
+        if (!pendingStart || !pendingEnd || pendingStart > pendingEnd) return;
+        onCustomRangeChange(pendingStart, pendingEnd);
+        setShowPicker(false);
+      };
+
+      React.useEffect(() => {
+        let cancelled = false;
+        const fetchData = async () => {
+          let months;
+          if (range === 'custom') {
+            if (!customStart || !customEnd) return;
+            months = getMonthsBetween(customStart, customEnd);
+          } else {
+            const now = new Date();
+            months = [];
+            for (let i = range - 1; i >= 0; i--) {
+              const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+              months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+            }
+          }
+
+          setLoading(true);
+          setError(null);
+          try {
+            // Compute full date range
+            const firstMonth = getMonthRange(months[0]);
+            const lastMonth = getMonthRange(months[months.length - 1]);
+            const fullStart = firstMonth.startDate;
+            const fullEnd = lastMonth.endDate;
+
+            // Fetch hours, overrides, and production/collections for all providers across the full range
+            const [hoursRows, overridesData, amountRows] = await Promise.all([
+              runQuery(`SELECT pl.ProvNum,
+                CONCAT(pr.FName,' ',pr.LName) as provName,
+                pr.IsSecondary as isHygienist,
+                DATE(apt.AptDateTime) as clinical_day,
+                TIMESTAMPDIFF(MINUTE,
+                  MIN(apt.AptDateTime),
+                  MAX(DATE_ADD(apt.AptDateTime, INTERVAL (CHAR_LENGTH(apt.Pattern)*5) MINUTE))
+                ) / 60.0 as auto_hours
+                FROM appointment apt
+                INNER JOIN procedurelog pl ON pl.AptNum = apt.AptNum
+                LEFT JOIN provider pr ON pl.ProvNum = pr.ProvNum
+                WHERE pl.ProcStatus = 2 AND apt.AptStatus = 2
+                  AND DATE(apt.AptDateTime) BETWEEN '${fullStart}' AND '${fullEnd}'
+                GROUP BY pl.ProvNum, DATE(apt.AptDateTime)`),
+              fetch('/api/hours-overrides').then(r => r.json()),
+              type === 'production'
+                ? runQuery(`SELECT pl.ProvNum, CONCAT(pr.FName,' ',pr.LName) as provName,
+                    pr.IsSecondary as isHygienist,
+                    DATE_FORMAT(pl.ProcDate, '%Y-%m') as period,
+                    SUM(pl.ProcFee*(pl.UnitQty+pl.BaseUnits)) AS amount
+                    FROM procedurelog pl
+                    LEFT JOIN provider pr ON pl.ProvNum = pr.ProvNum
+                    WHERE pl.ProcDate BETWEEN '${fullStart}' AND '${fullEnd}' AND pl.ProcStatus = 2
+                    GROUP BY pl.ProvNum, DATE_FORMAT(pl.ProcDate, '%Y-%m')`)
+                : (async () => {
+                    const [patRows, insRows] = await Promise.all([
+                      runQuery(`SELECT ps.ProvNum, DATE_FORMAT(ps.DatePay, '%Y-%m') as period,
+                        SUM(ps.SplitAmt) AS amount
+                        FROM paysplit ps WHERE ps.DatePay BETWEEN '${fullStart}' AND '${fullEnd}'
+                        GROUP BY ps.ProvNum, DATE_FORMAT(ps.DatePay, '%Y-%m')`),
+                      runQuery(`SELECT cp.ProvNum, DATE_FORMAT(cy.CheckDate, '%Y-%m') as period,
+                        SUM(cp.InsPayAmt) AS amount
+                        FROM claimpayment cy
+                        INNER JOIN claimproc cp ON cp.ClaimPaymentNum = cy.ClaimPaymentNum
+                        WHERE cy.CheckDate BETWEEN '${fullStart}' AND '${fullEnd}'
+                        GROUP BY cp.ProvNum, DATE_FORMAT(cy.CheckDate, '%Y-%m')`),
+                    ]);
+                    // Merge pat + ins by provNum+period
+                    const merged = {};
+                    patRows.forEach(r => {
+                      const k = `${r.ProvNum}:${r.period}`;
+                      merged[k] = (merged[k] || 0) + parseFloat(r.amount || 0);
+                    });
+                    insRows.forEach(r => {
+                      const k = `${r.ProvNum}:${r.period}`;
+                      merged[k] = (merged[k] || 0) + parseFloat(r.amount || 0);
+                    });
+                    // Convert back to array format
+                    return Object.entries(merged).map(([k, amount]) => {
+                      const [ProvNum, period] = k.split(':');
+                      return { ProvNum, period, amount };
+                    });
+                  })(),
+            ]);
+
+            if (cancelled) return;
+
+            // Build provider list (non-hygienist only)
+            const provMap = {};
+            hoursRows.forEach(r => {
+              if (r.isHygienist == 1) return;
+              if (!provMap[r.ProvNum]) provMap[r.ProvNum] = { provNum: r.ProvNum, provName: r.provName };
+            });
+            // Also add providers from amount data that may not appear in hours
+            if (type === 'production') {
+              amountRows.forEach(r => {
+                if (r.isHygienist == 1) return;
+                if (!provMap[r.ProvNum]) provMap[r.ProvNum] = { provNum: r.ProvNum, provName: r.provName || `Provider ${r.ProvNum}` };
+              });
+            }
+            const provList = Object.values(provMap);
+            setProviders(provList);
+
+            // Build hours lookup: provNum -> date -> effective hours
+            const hoursLookup = {};
+            hoursRows.forEach(r => {
+              if (r.isHygienist == 1) return;
+              const date = r.clinical_day?.split('T')[0] || r.clinical_day;
+              const key = `${r.ProvNum}:${date}`;
+              const effectiveHours = overridesData[key] != null ? overridesData[key] : parseFloat(r.auto_hours || 0);
+              if (!hoursLookup[r.ProvNum]) hoursLookup[r.ProvNum] = {};
+              hoursLookup[r.ProvNum][date] = effectiveHours;
+            });
+
+            // Build amount lookup: provNum -> month -> total amount
+            const amountLookup = {};
+            amountRows.forEach(r => {
+              if (r.isHygienist == 1) return;
+              if (!amountLookup[r.ProvNum]) amountLookup[r.ProvNum] = {};
+              amountLookup[r.ProvNum][r.period] = parseFloat(r.amount || 0);
+            });
+
+            // Compute $/hour per provider per month
+            const monthData = months.map(m => {
+              const { startDate, endDate } = getMonthRange(m);
+              const entry = { month: m };
+              provList.forEach(p => {
+                // Sum hours for this provider in this month
+                let totalHours = 0;
+                if (hoursLookup[p.provNum]) {
+                  Object.entries(hoursLookup[p.provNum]).forEach(([date, hrs]) => {
+                    if (date >= startDate && date <= endDate) totalHours += hrs;
+                  });
+                }
+                const totalAmount = amountLookup[p.provNum]?.[m] || 0;
+                entry[`hours_${p.provNum}`] = totalHours;
+                entry[`amount_${p.provNum}`] = totalAmount;
+                entry[`rate_${p.provNum}`] = totalHours > 0 ? totalAmount / totalHours : 0;
+              });
+              return entry;
+            });
+
+            // Apply grouping
+            const grouped = groupBy === 'month' ? monthData : (() => {
+              const getKey = (yearMonth) => {
+                const [y, mo] = yearMonth.split('-').map(Number);
+                if (groupBy === 'quarter') return `Q${Math.ceil(mo/3)} ${y}`;
+                if (groupBy === 'semiannual') return `H${mo <= 6 ? 1 : 2} ${y}`;
+                return `${y}`;
+              };
+              const buckets = {};
+              monthData.forEach(d => {
+                const key = getKey(d.month);
+                if (!buckets[key]) {
+                  buckets[key] = { label: key };
+                  provList.forEach(p => {
+                    buckets[key][`hours_${p.provNum}`] = 0;
+                    buckets[key][`amount_${p.provNum}`] = 0;
+                  });
+                }
+                provList.forEach(p => {
+                  buckets[key][`hours_${p.provNum}`] += d[`hours_${p.provNum}`] || 0;
+                  buckets[key][`amount_${p.provNum}`] += d[`amount_${p.provNum}`] || 0;
+                });
+              });
+              // Compute rates for grouped buckets
+              Object.values(buckets).forEach(b => {
+                provList.forEach(p => {
+                  const h = b[`hours_${p.provNum}`];
+                  b[`rate_${p.provNum}`] = h > 0 ? b[`amount_${p.provNum}`] / h : 0;
+                });
+              });
+              return Object.values(buckets);
+            })();
+
+            const getLabel = (d) => d.label || fmtMonth(d.month);
+            const colors = ['#18BFFF', '#FCB400', '#22C55E', '#EF4444', '#8B5CF6'];
+
+            if (chartInstance.current) chartInstance.current.destroy();
+            chartInstance.current = new Chart(chartRef.current, {
+              type: 'line',
+              data: {
+                labels: grouped.map(getLabel),
+                datasets: provList.map((p, i) => ({
+                  label: p.provName,
+                  data: grouped.map(d => d[`rate_${p.provNum}`]),
+                  borderColor: colors[i % colors.length],
+                  backgroundColor: colors[i % colors.length] + '1A',
+                  tension: 0.3,
+                  fill: false,
+                  borderWidth: 2,
+                  pointRadius: 4,
+                })),
+              },
+              options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { position: 'top' } },
+                scales: { y: { ticks: { callback: (v) => '$' + v.toFixed(0) } } },
+              },
+            });
+          } catch (e) {
+            if (!cancelled) setError(e.message);
+          } finally {
+            if (!cancelled) setLoading(false);
+          }
+        };
+        fetchData();
+        return () => {
+          cancelled = true;
+          if (chartInstance.current) { chartInstance.current.destroy(); chartInstance.current = null; }
+        };
+      }, [type, range, groupBy, customStart, customEnd, refreshKey]);
+
+      const customLabel = customStart && customEnd ? `${customStart} – ${customEnd}` : 'Custom';
+      const chartTitle = type === 'production' ? 'Hourly Production ($/hr)' : 'Hourly Collections ($/hr)';
+
+      return (
+        <div>
+          <div className="chart-container">
+            <div className="chart-header">
+              <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
+                <span className="chart-title">{chartTitle}</span>
+                <label style={{display:'flex',alignItems:'center',gap:'6px',fontSize:'13px',color:'var(--text-muted)',fontWeight:500}}>
+                  By:
+                  <select className="month-select" style={{fontSize:'13px',padding:'4px 8px'}}
+                    value={groupBy} onChange={e => onGroupByChange(e.target.value)}>
+                    <option value="month">Month</option>
+                    <option value="quarter">Quarter</option>
+                    <option value="semiannual">Semiannual</option>
+                    <option value="year">Year</option>
+                  </select>
+                </label>
+                <button className="manage-hours-btn" onClick={() => setShowHoursManager(true)}>
+                  Manage Hours
+                </button>
+              </div>
+              <div className="chart-controls">
+                <button className={`btn ${range === 6 ? 'btn-primary' : ''}`} onClick={() => onRangeChange(6)}>6 mo</button>
+                <button className={`btn ${range === 12 ? 'btn-primary' : ''}`} onClick={() => onRangeChange(12)}>12 mo</button>
+                <button className={`btn ${range === 'custom' ? 'btn-primary' : ''}`} onClick={openPicker}>
+                  {range === 'custom' ? customLabel : 'Custom Range\u2026'}
+                </button>
+              </div>
+            </div>
+
+            {showPicker && (
+              <div className="picker-overlay" onClick={e => { if (e.target === e.currentTarget) setShowPicker(false); }}>
+                <div className="picker-modal">
+                  <h3>Custom Date Range</h3>
+                  <div className="picker-field">
+                    <label>Start Date</label>
+                    <input type="date" value={pendingStart} onChange={e => setPendingStart(e.target.value)} />
+                  </div>
+                  <div className="picker-field">
+                    <label>End Date</label>
+                    <input type="date" value={pendingEnd} onChange={e => setPendingEnd(e.target.value)} min={pendingStart} />
+                  </div>
+                  {pendingStart && pendingEnd && pendingStart > pendingEnd && (
+                    <div style={{color:'#dc2626',fontSize:13,marginTop:-8,marginBottom:8}}>End date must be after start date.</div>
+                  )}
+                  <div className="picker-actions">
+                    <button className="btn" onClick={() => setShowPicker(false)}>Cancel</button>
+                    <button className="btn btn-primary" onClick={applyCustom}
+                      disabled={!pendingStart || !pendingEnd || pendingStart > pendingEnd}>
+                      Apply
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {loading && <div className="loading"><span className="spinner"></span> Loading hourly data...</div>}
+            {error && <div className="error-box">{error}</div>}
+            <div className="chart-canvas-wrap" style={{display: loading ? 'none' : 'block'}}>
+              <canvas ref={chartRef}></canvas>
+            </div>
+          </div>
+
+          {showHoursManager && providers.length > 0 && (
+            <ProviderHoursManager
+              providers={providers}
+              onClose={() => setShowHoursManager(false)}
+              onSaved={() => setRefreshKey(k => k + 1)}
+            />
+          )}
+        </div>
+      );
+    }
+
     // ── MonthNav ──────────────────────────────────────────────────────────────
     const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
