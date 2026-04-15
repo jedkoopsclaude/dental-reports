@@ -872,9 +872,7 @@
 
       const applyCustom = () => {
         if (!pendingStart || !pendingEnd || pendingStart > pendingEnd) return;
-        setCustomStart(pendingStart);
-        setCustomEnd(pendingEnd);
-        setRange('custom');
+        onCustomRangeChange(pendingStart, pendingEnd);
         setShowPicker(false);
       };
 
