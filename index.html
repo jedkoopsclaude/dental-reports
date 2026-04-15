@@ -1654,6 +1654,23 @@
               {renderContent()}
             </div>
           </div>
+          {showAdminPrompt && (
+            <div className="hours-manager-overlay" onClick={e => { if (e.target === e.currentTarget) { setShowAdminPrompt(false); setAdminPw(''); setAdminError(false); } }}>
+              <div style={{background:'var(--bg)',borderRadius:12,padding:24,width:320,boxShadow:'0 8px 32px rgba(0,0,0,0.18)'}}>
+                <h3 style={{margin:'0 0 16px',fontSize:15,fontWeight:600}}>Admin Login</h3>
+                <form onSubmit={e => { e.preventDefault(); handleAdminSubmit(); }}>
+                  <input ref={adminInputRef} type="password" value={adminPw} onChange={e => { setAdminPw(e.target.value); setAdminError(false); }}
+                    placeholder="Enter password"
+                    style={{width:'100%',padding:'8px 10px',border:`1px solid ${adminError ? 'var(--danger)' : 'var(--border)'}`,borderRadius:'var(--radius)',fontFamily:'var(--font)',fontSize:14,boxSizing:'border-box'}} />
+                  {adminError && <div style={{color:'var(--danger)',fontSize:12,marginTop:6}}>Incorrect password.</div>}
+                  <div style={{display:'flex',gap:8,justifyContent:'flex-end',marginTop:16}}>
+                    <button type="button" className="btn" onClick={() => { setShowAdminPrompt(false); setAdminPw(''); setAdminError(false); }}>Cancel</button>
+                    <button type="submit" className="btn btn-primary">Login</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
         </div>
       );
     }
