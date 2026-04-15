@@ -510,27 +510,18 @@
           setError(null);
           try {
             const { startDate: s, endDate: e } = getMonthRange(month);
-            const [assocPatRows, assocInsRows, labCaseRows, assocCrownRows] = await Promise.all([
-              runQuery(`SELECT SUM(ps.SplitAmt) AS pattotal FROM paysplit ps WHERE ps.ProvNum=216 AND ps.DatePay BETWEEN '${s}' AND '${e}'`),
-              runQuery(`SELECT SUM(cp.InsPayAmt) AS instotal FROM claimpayment cy INNER JOIN claimproc cp ON cp.ClaimPaymentNum=cy.ClaimPaymentNum WHERE cp.ProvNum=216 AND cy.CheckDate BETWEEN '${s}' AND '${e}'`),
+            const [labCaseRows, assocCrownRows] = await Promise.all([
               runQuery(`SELECT l.DateTimeRecd, CONCAT(p.FName,' ',p.LName) as Name, lab.Description, l.LabFee, a.Note FROM labcase l LEFT JOIN patient p ON p.PatNum=l.PatNum LEFT JOIN laboratory lab ON lab.LaboratoryNum=l.LaboratoryNum LEFT JOIN appointment a ON a.AptNum=l.AptNum WHERE l.ProvNum=216 AND l.DateTimeRecd BETWEEN '${s}' AND '${e}' ORDER BY l.DateTimeRecd`),
               runQuery(`SELECT COUNT(*) AS Total FROM procedurelog pl INNER JOIN procedurecode pc ON pc.CodeNum=pl.CodeNum WHERE pl.ProvNum=216 AND pl.ProcDate BETWEEN '${s}' AND '${e}' AND pl.ProcStatus=2 AND pc.ProcCode IN ('D2740','D6058','D6740','D6245')`),
             ]);
 
             if (cancelled) return;
 
-            const assocPatAmt = parseFloat(assocPatRows[0]?.pattotal || 0);
-            const assocInsAmt = parseFloat(assocInsRows[0]?.instotal || 0);
-            const assocTotal = assocPatAmt + assocInsAmt;
-            const compensation = assocTotal * 0.35;
             const totalLabFees = labCaseRows.reduce((sum, r) => sum + parseFloat(r.LabFee || 0), 0);
-            const labFeeShare = totalLabFees * 0.30;
-            const paycheck = compensation - labFeeShare;
             const assocCrowns = parseInt(assocCrownRows[0]?.Total || 0);
 
             setData({
-              assocTotal, compensation, totalLabFees, labFeeShare, paycheck,
-              labCases: labCaseRows, assocCrowns,
+              totalLabFees, labCases: labCaseRows, assocCrowns,
             });
           } catch (e) {
             if (!cancelled) setError(e.message);
