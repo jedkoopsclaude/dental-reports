@@ -1305,7 +1305,6 @@
             // Build amount lookup: provNum -> month -> total amount
             const amountLookup = {};
             amountRows.forEach(r => {
-              if (r.isHygienist == 1) return;
               if (!amountLookup[r.ProvNum]) amountLookup[r.ProvNum] = {};
               amountLookup[r.ProvNum][r.period] = parseFloat(r.amount || 0);
             });
