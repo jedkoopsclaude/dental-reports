@@ -34,29 +34,7 @@ class Assoclabs extends CI_Controller {
 		// Pull data from OpenDental
 		$opendentaldb = $this->load->database('opendental', TRUE); // the TRUE paramater tells CI that you'd like to return the database object.
 
-		// Get Associate's Collections
-
 		$assocID = 216;
-		//Associate's Patient collections 
-		$query = $opendentaldb->query("SELECT SUM(ps.SplitAmt) AS pattotal FROM paysplit ps ".
-				" WHERE ps.ProvNum=$assocID AND ps.DatePay BETWEEN '$startDate' AND '$endDate'");
-		$jfpRow = $query->row();
-		$jfPat = '$'.number_format($jfpRow->pattotal, 2);
-
-		// Next get Associate's Ins collections 
-		$query = $opendentaldb->query("SELECT SUM(cp.InsPayAmt) AS instotal FROM claimpayment cy ".
-				" INNER JOIN claimproc cp ON cp.ClaimPaymentNum=cy.ClaimPaymentNum ".
-			 	" WHERE cp.ProvNum=$assocID AND cy.CheckDate  BETWEEN '$startDate' AND '$endDate'");
-		$jfiRow = $query->row();
-		$jfIns = '$'.number_format($jfiRow->instotal, 2);
-		
-		// Calc Associate's total collections
-		$jfTotal = $jfpRow->pattotal + $jfiRow->instotal;
-		$prettyjfTotal = '$'.number_format( $jfTotal, 2 );
-		$html .= "<div id='jerrytotal'><span class='provname'>Dr. Thanh's Collections:</span><span class='accounting'>$prettyjfTotal</span></div>";
-		$thirtythree = $jfTotal * 0.35;
-		$pretty33 = '$'.number_format( $thirtythree, 2);
-		$html .= "<div id='jerry33' class='row'><span class='provname'>35%:</span><span class='accounting'>$pretty33</span></div>";
 		// Calculate total Lab fees
 		/* SELECT l.DateTimeRecd,CONCAT(p.FName,' ',p.LName) as Name,lab.Description,l.LabFee,a.Note from labcase l
 			LEFT JOIN patient p ON p.Patnum=l.PatNum
