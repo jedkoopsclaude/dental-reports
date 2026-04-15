@@ -1294,7 +1294,7 @@
             // Build hours lookup: provNum -> date -> effective hours
             const hoursLookup = {};
             hoursRows.forEach(r => {
-              if (r.isHygienist == 1) return;
+              if (HIDDEN_PROVIDERS.includes(r.provName)) return;
               const date = r.clinical_day?.split('T')[0] || r.clinical_day;
               const key = `${r.ProvNum}:${date}`;
               const effectiveHours = overridesData[key] != null ? overridesData[key] : parseFloat(r.auto_hours || 0);
