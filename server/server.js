@@ -197,6 +197,58 @@ Return only the SQL query with no explanation, no markdown, no code blocks.`;
   }
 });
 
+const OVERRIDES_PATH = path.join(__dirname, 'data', 'hours-overrides.json');
+
+function readOverrides() {
+  try { return JSON.parse(fs.readFileSync(OVERRIDES_PATH, 'utf8')); }
+  catch { return {}; }
+}
+
+function writeOverrides(data) {
+  const dir = path.dirname(OVERRIDES_PATH);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(OVERRIDES_PATH, JSON.stringify(data, null, 2));
+}
+
+// GET /api/hours-overrides?provNum=43 — returns overrides (optionally filtered)
+app.get('/api/hours-overrides', (req, res) => {
+  const overrides = readOverrides();
+  const { provNum } = req.query;
+  if (provNum) {
+    const prefix = provNum + ':';
+    const filtered = {};
+    for (const [k, v] of Object.entries(overrides)) {
+      if (k.startsWith(prefix)) filtered[k] = v;
+    }
+    return res.json(filtered);
+  }
+  return res.json(overrides);
+});
+
+// POST /api/hours-overrides — upsert { provNum, date, hours }
+app.post('/api/hours-overrides', (req, res) => {
+  const { provNum, date, hours } = req.body;
+  if (!provNum || !date || hours == null) {
+    return res.status(400).json({ error: 'provNum, date, and hours are required.' });
+  }
+  const overrides = readOverrides();
+  overrides[`${provNum}:${date}`] = parseFloat(hours);
+  writeOverrides(overrides);
+  return res.json({ ok: true });
+});
+
+// DELETE /api/hours-overrides — remove { provNum, date }
+app.delete('/api/hours-overrides', (req, res) => {
+  const { provNum, date } = req.body;
+  if (!provNum || !date) {
+    return res.status(400).json({ error: 'provNum and date are required.' });
+  }
+  const overrides = readOverrides();
+  delete overrides[`${provNum}:${date}`];
+  writeOverrides(overrides);
+  return res.json({ ok: true });
+});
+
 // Start server
 app.listen(PORT, () => {
   console.log(`[INFO] dental-reports server listening on http://localhost:${PORT}`);
