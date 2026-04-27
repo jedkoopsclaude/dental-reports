@@ -23,7 +23,19 @@
       "Bash(npx kill-port *)",
       "Bash(node server.js)",
       "Bash(curl -s http://localhost:3000/api/hours-overrides)",
-      "Bash(curl *)"
+      "Bash(curl *)",
+      "Bash(netstat -ano)",
+      "Bash(where node *)",
+      "Bash(reg query *)",
+      "PowerShell(Select-String *)",
+      "PowerShell(Get-WinEvent -LogName System -MaxEvents 50 | Where-Object { $_.TimeCreated -gt \\(Get-Date\\).AddDays\\(-2\\) -and $_.LevelDisplayName -match 'Error|Warning' } | Select-Object TimeCreated, LevelDisplayName, Message -First 10 | Format-List)",
+      "PowerShell(Get-WinEvent -LogName Application -MaxEvents 100 | Where-Object { $_.TimeCreated -gt \\(Get-Date\\).AddDays\\(-1\\) -and \\($_.Message -match 'wscript|vbs|node|dental' -or $_.ProviderName -match 'wscript'\\) } | Select-Object TimeCreated, LevelDisplayName, ProviderName, Message -First 10 | Format-List)",
+      "PowerShell(Get-WinEvent -LogName System -MaxEvents 20 | Where-Object { $_.Id -eq 12 -or $_.Id -eq 6005 -or $_.Id -eq 6006 } | Select-Object TimeCreated, Id, Message | Format-List)",
+      "PowerShell(gcim Win32_OperatingSystem *)",
+      "Bash(tasklist *)",
+      "PowerShell(tasklist *)",
+      "PowerShell(Get-ChildItem *)",
+      "PowerShell(Get-WinEvent -LogName Application | Where-Object { $_.Id -eq 1000 -and $_.Message -match 'node' -and $_.TimeCreated -gt \\(Get-Date\\).AddDays\\(-5\\) } | Select-Object TimeCreated, Message -First 5 | Format-List)"
     ]
   },
   "remote": {
