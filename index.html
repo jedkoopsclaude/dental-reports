@@ -1630,7 +1630,7 @@
 
       const renderContent = () => {
         if (activeView === 'monthly') return <MonthlyStats month={month} />;
-        if (activeView === 'assoclabs') return <AssocLabs month={month} />;
+        if (activeView === 'assoclabs') return <AssocLabs month={month} isAdmin={isAdmin} />;
         if (activeView === 'ai-query') return <AIQuery month={month} />;
         if (activeView === 'prod-trends') return <ChartView type="production" {...chartRangeProps} />;
         if (activeView === 'coll-trends') return <ChartView type="collections" {...chartRangeProps} />;
