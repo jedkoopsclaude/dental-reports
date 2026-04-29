@@ -560,6 +560,22 @@
 
       return (
         <div style={{maxWidth:'700px'}}>
+          {/* PAYCHECK (admin only) */}
+          {isAdmin && (
+            <div className="report-section">
+              <div className="report-section-header">Paycheck</div>
+              <table className="report-table">
+                <tbody>
+                  <tr><td>Dr. Thanh's Collections</td><td className="money">{fmt(d.assocCollections)}</td></tr>
+                  <tr><td>35%</td><td className="money">{fmt(d.collections35)}</td></tr>
+                  <tr><td>Lab Fees</td><td className="money">{fmt(d.totalLabFees)}</td></tr>
+                  <tr><td>30%</td><td className="money">{fmt(d.labFees30)}</td></tr>
+                  <tr className="total"><td>Paycheck</td><td className="money">{fmt(d.paycheck)}</td></tr>
+                </tbody>
+              </table>
+            </div>
+          )}
+
           {/* LAB CASE DETAILS */}
           <div className="report-section">
             <div className="report-section-header">Lab Case Details</div>
