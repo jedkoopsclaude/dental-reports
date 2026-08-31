@@ -221,6 +221,27 @@
     const HIDDEN_PROVIDERS = ['new patient', 'orange place family dentistry', 'temp hygienist', 'temp', 'temp temp'];
     const PROVIDER_ORDER = ['Jed Koops', 'Thanh Mollica', 'Melanie Lemieux', 'Sarah Johnston', 'Benn Gibbs', 'Janet Kerman'];
     const isHiddenProvider = (name) => HIDDEN_PROVIDERS.includes((name || '').trim().toLowerCase());
+
+    // HIDDEN_PROVIDERS mixes two different things: real people we keep out of the
+    // per-provider legend (TEMP TEMP is an actual hygienist working full days),
+    // and these two, which are not people at all — 'New Patient' is a scheduling
+    // placeholder that carries exactly one appointment per day, and 'Orange Place
+    // Family Dentistry' is the practice itself. Their money is office money and
+    // still counts, but they never worked a day or an hour, so they are kept out
+    // of the office denominators.
+    const PLACEHOLDER_PROVIDERS = ['new patient', 'orange place family dentistry'];
+    const isPlaceholderProvider = (name) => PLACEHOLDER_PROVIDERS.includes((name || '').trim().toLowerCase());
+
+    // The practice runs Monday-Thursday. Friday/Saturday/Sunday activity is
+    // emergency visits — typically a single patient seen for under an hour — and
+    // one or two appointments is not a day worked. Genuine weekend clinic days do
+    // happen (Fri 2026-01-30 ran Jed 17 appts + two hygienists at 7 hours each),
+    // so this gates on appointment count rather than blanking the weekend.
+    const EMERGENCY_APPT_MAX = 2;
+    const isEmergencyDay = (date, apptCount) => {
+      const dow = new Date(date + 'T00:00:00').getDay(); // 0 Sun … 5 Fri, 6 Sat
+      return (dow === 5 || dow === 6 || dow === 0) && apptCount <= EMERGENCY_APPT_MAX;
+    };
     const provSortIndex = (name) => {
       const idx = PROVIDER_ORDER.findIndex(p => p.toLowerCase() === (name || '').trim().toLowerCase());
       return idx === -1 ? 999 : idx;
@@ -1208,8 +1229,8 @@
     // fabricated $0 that a zero-hour period used to yield.
     const MIN_HOURS_FOR_RATE = 4;
 
-    // Same guard for the $/day charts: no office days in a bucket means there is
-    // no per-day rate to plot, only money with nothing to divide it by.
+    // Same guard for the $/day charts: no provider-days in a bucket means there
+    // is no per-day rate to plot, only money with nothing to divide it by.
     const MIN_DAYS_FOR_RATE = 1;
 
     // ── HourlyChartView ──────────────────────────────────────────────────────
@@ -1276,6 +1297,7 @@
                 CONCAT(pr.FName,' ',pr.LName) as provName,
                 pr.IsSecondary as isHygienist,
                 DATE(apt.AptDateTime) as clinical_day,
+                COUNT(DISTINCT apt.AptNum) as appt_count,
                 TIMESTAMPDIFF(MINUTE,
                   MIN(apt.AptDateTime),
                   MAX(DATE_ADD(apt.AptDateTime, INTERVAL (CHAR_LENGTH(apt.Pattern)*5) MINUTE))
@@ -1356,15 +1378,21 @@
             // with the Monthly Stats gross figures, which apply no provider
             // filter. Excluding them understated office collections by ~$7k in
             // August 2026 alone.
-            const officeDates = new Set();      // distinct days the office saw patients
+            // providerDayDates holds one entry per provider per day worked — so a
+            // day with four providers in the chairs counts four times. That is the
+            // denominator for the $/day charts.
+            const providerDayDates = [];
             const officeHoursByDate = {};       // date -> clinical hours, all providers
             hoursRows.forEach(r => {
               const date = r.clinical_day?.split('T')[0] || r.clinical_day;
               if (!date) return;
               const key = `${r.ProvNum}:${date}`;
               const effectiveHours = overridesData[key] != null ? overridesData[key] : parseFloat(r.auto_hours || 0);
-              officeDates.add(date);
-              officeHoursByDate[date] = (officeHoursByDate[date] || 0) + effectiveHours;
+              const isPlaceholder = isPlaceholderProvider(r.provName);
+              if (!isPlaceholder) {
+                officeHoursByDate[date] = (officeHoursByDate[date] || 0) + effectiveHours;
+                if (!isEmergencyDay(date, parseInt(r.appt_count || 0, 10))) providerDayDates.push(date);
+              }
               if (isHiddenProvider(r.provName)) return;
               if (!hoursLookup[r.ProvNum]) hoursLookup[r.ProvNum] = {};
               hoursLookup[r.ProvNum][date] = effectiveHours;
@@ -1384,13 +1412,13 @@
             });
 
             // Compute $/hour per provider per month
-            const officeDateList = [...officeDates];
+            const officeDateList = Object.keys(officeHoursByDate);
             const monthData = months.map(m => {
               const { startDate, endDate } = getMonthRange(m);
               const entry = { month: m };
-              const monthDates = officeDateList.filter(d => d >= startDate && d <= endDate);
-              entry.officeDays = monthDates.length;
-              entry.officeHours = monthDates.reduce((sum, d) => sum + officeHoursByDate[d], 0);
+              entry.providerDays = providerDayDates.filter(d => d >= startDate && d <= endDate).length;
+              entry.officeHours = officeDateList.reduce(
+                (sum, d) => (d >= startDate && d <= endDate ? sum + officeHoursByDate[d] : sum), 0);
               entry.officeAmount = officeAmountByMonth[m] || 0;
               provList.forEach(p => {
                 // Sum hours for this provider in this month
@@ -1420,14 +1448,14 @@
               monthData.forEach(d => {
                 const key = getKey(d.month);
                 if (!buckets[key]) {
-                  buckets[key] = { label: key, officeDays: 0, officeHours: 0, officeAmount: 0 };
+                  buckets[key] = { label: key, providerDays: 0, officeHours: 0, officeAmount: 0 };
                   provList.forEach(p => {
                     buckets[key][`hours_${p.provNum}`] = 0;
                     buckets[key][`amount_${p.provNum}`] = 0;
                   });
                 }
                 // Clinical days never straddle two months, so summing is safe.
-                buckets[key].officeDays += d.officeDays || 0;
+                buckets[key].providerDays += d.providerDays || 0;
                 buckets[key].officeHours += d.officeHours || 0;
                 buckets[key].officeAmount += d.officeAmount || 0;
                 provList.forEach(p => {
@@ -1471,9 +1499,9 @@
           d.officeHours >= MIN_HOURS_FOR_RATE ? d.officeAmount / d.officeHours : null
         );
 
-        // Office per-day: total dollars / distinct days the office saw patients.
+        // Office per-day: total dollars / provider-days worked.
         const dailyRate = (d) => (
-          d.officeDays >= MIN_DAYS_FOR_RATE ? d.officeAmount / d.officeDays : null
+          d.providerDays >= MIN_DAYS_FOR_RATE ? d.officeAmount / d.providerDays : null
         );
 
         const datasets = metric === 'daily'
@@ -1526,7 +1554,7 @@
 
       const customLabel = customStart && customEnd ? `${customStart} – ${customEnd}` : 'Custom';
       const chartTitle = metric === 'daily'
-        ? (type === 'production' ? 'Daily Production ($/day)' : 'Daily Collections ($/day)')
+        ? (type === 'production' ? 'Daily Production ($/provider-day)' : 'Daily Collections ($/provider-day)')
         : (type === 'production' ? 'Hourly Production ($/hr)' : 'Hourly Collections ($/hr)');
 
       return (
