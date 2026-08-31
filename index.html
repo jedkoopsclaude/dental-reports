@@ -1345,19 +1345,35 @@
             const provList = Object.values(provMap).sort((a, b) => provSortIndex(a.provName) - provSortIndex(b.provName));
             setProviders(provList);
 
-            // Build hours lookup: provNum -> date -> effective hours.
-            // officeDates collects every distinct day the office saw patients,
-            // which is the denominator for the $/day charts.
+            // Per-provider lookup: provNum -> date -> effective hours, visible
+            // providers only (these become the individual chart lines).
             const hoursLookup = {};
-            const officeDates = new Set();
+
+            // Office-wide aggregates deliberately include EVERY provider, the
+            // hidden ones too. HIDDEN_PROVIDERS exists to keep temps and
+            // placeholders out of the per-provider legend, not to redefine what
+            // the practice did — and a "full office" number has to reconcile
+            // with the Monthly Stats gross figures, which apply no provider
+            // filter. Excluding them understated office collections by ~$7k in
+            // August 2026 alone.
+            const officeDates = new Set();      // distinct days the office saw patients
+            const officeHoursByDate = {};       // date -> clinical hours, all providers
             hoursRows.forEach(r => {
-              if (isHiddenProvider(r.provName)) return;
               const date = r.clinical_day?.split('T')[0] || r.clinical_day;
-              if (date) officeDates.add(date);
+              if (!date) return;
               const key = `${r.ProvNum}:${date}`;
               const effectiveHours = overridesData[key] != null ? overridesData[key] : parseFloat(r.auto_hours || 0);
+              officeDates.add(date);
+              officeHoursByDate[date] = (officeHoursByDate[date] || 0) + effectiveHours;
+              if (isHiddenProvider(r.provName)) return;
               if (!hoursLookup[r.ProvNum]) hoursLookup[r.ProvNum] = {};
               hoursLookup[r.ProvNum][date] = effectiveHours;
+            });
+
+            // Office money by month, all providers included.
+            const officeAmountByMonth = {};
+            amountRows.forEach(r => {
+              officeAmountByMonth[r.period] = (officeAmountByMonth[r.period] || 0) + parseFloat(r.amount || 0);
             });
 
             // Build amount lookup: provNum -> month -> total amount
@@ -1372,8 +1388,10 @@
             const monthData = months.map(m => {
               const { startDate, endDate } = getMonthRange(m);
               const entry = { month: m };
-              entry.officeDays = officeDateList.filter(d => d >= startDate && d <= endDate).length;
-              entry.officeAmount = 0;
+              const monthDates = officeDateList.filter(d => d >= startDate && d <= endDate);
+              entry.officeDays = monthDates.length;
+              entry.officeHours = monthDates.reduce((sum, d) => sum + officeHoursByDate[d], 0);
+              entry.officeAmount = officeAmountByMonth[m] || 0;
               provList.forEach(p => {
                 // Sum hours for this provider in this month
                 let totalHours = 0;
@@ -1386,7 +1404,6 @@
                 entry[`hours_${p.provNum}`] = totalHours;
                 entry[`amount_${p.provNum}`] = totalAmount;
                 entry[`rate_${p.provNum}`] = totalHours >= MIN_HOURS_FOR_RATE ? totalAmount / totalHours : null;
-                entry.officeAmount += totalAmount;
               });
               return entry;
             });
@@ -1403,7 +1420,7 @@
               monthData.forEach(d => {
                 const key = getKey(d.month);
                 if (!buckets[key]) {
-                  buckets[key] = { label: key, officeDays: 0, officeAmount: 0 };
+                  buckets[key] = { label: key, officeDays: 0, officeHours: 0, officeAmount: 0 };
                   provList.forEach(p => {
                     buckets[key][`hours_${p.provNum}`] = 0;
                     buckets[key][`amount_${p.provNum}`] = 0;
@@ -1411,6 +1428,7 @@
                 }
                 // Clinical days never straddle two months, so summing is safe.
                 buckets[key].officeDays += d.officeDays || 0;
+                buckets[key].officeHours += d.officeHours || 0;
                 buckets[key].officeAmount += d.officeAmount || 0;
                 provList.forEach(p => {
                   buckets[key][`hours_${p.provNum}`] += d[`hours_${p.provNum}`] || 0;
@@ -1446,16 +1464,12 @@
         const getLabel = (d) => d.label || fmtMonth(d.month);
         const colors = ['#18BFFF', '#FCB400', '#22C55E', '#EF4444', '#8B5CF6'];
 
-        // Office composite: total dollars across all providers / total hours across
-        // all providers for the bucket (a weighted rate, not a sum of the lines).
-        const compositeRate = (d) => {
-          let hours = 0, amount = 0;
-          provList.forEach(p => {
-            hours += d[`hours_${p.provNum}`] || 0;
-            amount += d[`amount_${p.provNum}`] || 0;
-          });
-          return hours >= MIN_HOURS_FOR_RATE ? amount / hours : null;
-        };
+        // Office composite: all office dollars / all office clinical hours for the
+        // bucket. A weighted rate, not a sum of the provider lines — a dentist at
+        // $900/hr plus a hygienist at $180/hr is not an office at $1,080/hr.
+        const compositeRate = (d) => (
+          d.officeHours >= MIN_HOURS_FOR_RATE ? d.officeAmount / d.officeHours : null
+        );
 
         // Office per-day: total dollars / distinct days the office saw patients.
         const dailyRate = (d) => (
