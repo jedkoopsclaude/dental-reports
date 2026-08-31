@@ -35,7 +35,8 @@
       "Bash(tasklist *)",
       "PowerShell(tasklist *)",
       "PowerShell(Get-ChildItem *)",
-      "PowerShell(Get-WinEvent -LogName Application | Where-Object { $_.Id -eq 1000 -and $_.Message -match 'node' -and $_.TimeCreated -gt \\(Get-Date\\).AddDays\\(-5\\) } | Select-Object TimeCreated, Message -First 5 | Format-List)"
+      "PowerShell(Get-WinEvent -LogName Application | Where-Object { $_.Id -eq 1000 -and $_.Message -match 'node' -and $_.TimeCreated -gt \\(Get-Date\\).AddDays\\(-5\\) } | Select-Object TimeCreated, Message -First 5 | Format-List)",
+      "PowerShell(Get-Process *)"
     ]
   },
   "remote": {
