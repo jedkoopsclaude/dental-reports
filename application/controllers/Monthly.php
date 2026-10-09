@@ -288,7 +288,7 @@ class Monthly extends CI_Controller {
 		$crownRow = $query->row();
 		$crownTotal = $crownRow->Total;
 		$grandTotal += $crownTotal;
-		$html .= "<div id='tcrowns'><span class='provname'>Thanh's Total Crown Units:</span><span class='accounting'>$crownTotal</span></div>";
+		$html .= "<div id='tcrowns'><span class='provname'>Associate's Total Crown Units:</span><span class='accounting'>$crownTotal</span></div>";
 		$html .= "<div style='font-weight:bold'><span class='provname'>Grand Total Crown Units:</span><span class='accounting'>$grandTotal</span></div>";
 
 		
