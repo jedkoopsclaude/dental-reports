@@ -1388,10 +1388,15 @@
               if (!date) return;
               const key = `${r.ProvNum}:${date}`;
               const effectiveHours = overridesData[key] != null ? overridesData[key] : parseFloat(r.auto_hours || 0);
-              const isPlaceholder = isPlaceholderProvider(r.provName);
-              if (!isPlaceholder) {
+              // A weekend emergency is neither a day worked nor a block of clinical
+              // hours. auto_hours spans first-appointment-start to last-appointment-end,
+              // so Fri 2025-09-05 — two emergency patients seen 11.5 hours apart —
+              // booked 11.5 clinical hours for roughly one hour of chair time. Left in,
+              // that one day dragged September's office $/hr down by about 2%.
+              if (isEmergencyDay(date, parseInt(r.appt_count || 0, 10))) return;
+              if (!isPlaceholderProvider(r.provName)) {
                 officeHoursByDate[date] = (officeHoursByDate[date] || 0) + effectiveHours;
-                if (!isEmergencyDay(date, parseInt(r.appt_count || 0, 10))) providerDayDates.push(date);
+                providerDayDates.push(date);
               }
               if (isHiddenProvider(r.provName)) return;
               if (!hoursLookup[r.ProvNum]) hoursLookup[r.ProvNum] = {};
