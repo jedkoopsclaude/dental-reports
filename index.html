@@ -1338,7 +1338,7 @@
     // fabricated $0 that a zero-hour period used to yield.
     const MIN_HOURS_FOR_RATE = 4;
 
-    // Same guard for the $/day charts: no provider-days in a bucket means there
+    // Same guard for the $/day charts: no office days in a bucket means there
     // is no per-day rate to plot, only money with nothing to divide it by.
     const MIN_DAYS_FOR_RATE = 1;
 
@@ -1401,7 +1401,7 @@
             const fullEnd = lastMonth.endDate;
 
             // Fetch hours, overrides, and production/collections for all providers across the full range
-            const [hoursRows, overridesData, amountRows] = await Promise.all([
+            const [hoursRows, overridesData, amountRows, netAdjRows] = await Promise.all([
               runQuery(`SELECT pl.ProvNum,
                 CONCAT(pr.FName,' ',pr.LName) as provName,
                 pr.IsSecondary as isHygienist,
@@ -1456,6 +1456,17 @@
                       return { ProvNum, period, amount };
                     });
                   })(),
+              // Daily production is net production: the same gross + adjustments
+              // − write-offs that Monthly Stats reports. Gross fees overstate what
+              // a day actually earns by about a third.
+              metric === 'daily' && type === 'production'
+                ? runQuery(`SELECT t.period, SUM(t.amt) AS amount FROM (
+                    SELECT DATE_FORMAT(AdjDate, '%Y-%m') AS period, AdjAmt AS amt FROM adjustment
+                      WHERE AdjDate BETWEEN '${fullStart}' AND '${fullEnd}'
+                    UNION ALL SELECT DATE_FORMAT(DateCp, '%Y-%m'), -WriteOff FROM claimproc
+                      WHERE Status IN (1,4,5,7) AND DateCp BETWEEN '${fullStart}' AND '${fullEnd}'
+                    ) t GROUP BY t.period`)
+                : [],
             ]);
 
             if (cancelled) return;
@@ -1487,10 +1498,11 @@
             // with the Monthly Stats gross figures, which apply no provider
             // filter. Excluding them understated office collections by ~$7k in
             // August 2026 alone.
-            // providerDayDates holds one entry per provider per day worked — so a
-            // day with four providers in the chairs counts four times. That is the
-            // denominator for the $/day charts.
-            const providerDayDates = [];
+            // officeDays holds each date the office saw patients, once. That is the
+            // denominator for the $/day charts. It used to count one per provider
+            // per day, so a day with five providers in the chairs counted five
+            // times and the chart read ~$3k/day against a real ~$10k.
+            const officeDays = new Set();
             const officeHoursByDate = {};       // date -> clinical hours, all providers
             hoursRows.forEach(r => {
               const date = r.clinical_day?.split('T')[0] || r.clinical_day;
@@ -1505,7 +1517,7 @@
               if (isEmergencyDay(date, parseInt(r.appt_count || 0, 10))) return;
               if (!isPlaceholderProvider(r.provName)) {
                 officeHoursByDate[date] = (officeHoursByDate[date] || 0) + effectiveHours;
-                providerDayDates.push(date);
+                officeDays.add(date);
               }
               if (isHiddenProvider(r.provName)) return;
               if (!hoursLookup[r.ProvNum]) hoursLookup[r.ProvNum] = {};
@@ -1517,6 +1529,10 @@
             amountRows.forEach(r => {
               officeAmountByMonth[r.period] = (officeAmountByMonth[r.period] || 0) + parseFloat(r.amount || 0);
             });
+
+            // Adjustments and write-offs by month, for daily net production.
+            const netAdjByMonth = {};
+            netAdjRows.forEach(r => { netAdjByMonth[r.period] = parseFloat(r.amount || 0); });
 
             // Build amount lookup: provNum -> month -> total amount
             const amountLookup = {};
@@ -1530,10 +1546,11 @@
             const monthData = months.map(m => {
               const { startDate, endDate } = getMonthRange(m);
               const entry = { month: m };
-              entry.providerDays = providerDayDates.filter(d => d >= startDate && d <= endDate).length;
+              entry.officeDays = [...officeDays].filter(d => d >= startDate && d <= endDate).length;
               entry.officeHours = officeDateList.reduce(
                 (sum, d) => (d >= startDate && d <= endDate ? sum + officeHoursByDate[d] : sum), 0);
               entry.officeAmount = officeAmountByMonth[m] || 0;
+              entry.dailyAmount = entry.officeAmount + (netAdjByMonth[m] || 0);
               provList.forEach(p => {
                 // Sum hours for this provider in this month
                 let totalHours = 0;
@@ -1562,16 +1579,17 @@
               monthData.forEach(d => {
                 const key = getKey(d.month);
                 if (!buckets[key]) {
-                  buckets[key] = { label: key, providerDays: 0, officeHours: 0, officeAmount: 0 };
+                  buckets[key] = { label: key, officeDays: 0, officeHours: 0, officeAmount: 0, dailyAmount: 0 };
                   provList.forEach(p => {
                     buckets[key][`hours_${p.provNum}`] = 0;
                     buckets[key][`amount_${p.provNum}`] = 0;
                   });
                 }
                 // Clinical days never straddle two months, so summing is safe.
-                buckets[key].providerDays += d.providerDays || 0;
+                buckets[key].officeDays += d.officeDays || 0;
                 buckets[key].officeHours += d.officeHours || 0;
                 buckets[key].officeAmount += d.officeAmount || 0;
+                buckets[key].dailyAmount += d.dailyAmount || 0;
                 provList.forEach(p => {
                   buckets[key][`hours_${p.provNum}`] += d[`hours_${p.provNum}`] || 0;
                   buckets[key][`amount_${p.provNum}`] += d[`amount_${p.provNum}`] || 0;
@@ -1596,7 +1614,7 @@
         };
         fetchData();
         return () => { cancelled = true; };
-      }, [type, range, groupBy, customStart, customEnd, refreshKey]);
+      }, [type, metric, range, groupBy, customStart, customEnd, refreshKey]);
 
       // Render the chart from the fetched data. Kept separate from fetching so
       // flipping between provider lines and the office composite is instant.
@@ -1613,9 +1631,9 @@
           d.officeHours >= MIN_HOURS_FOR_RATE ? d.officeAmount / d.officeHours : null
         );
 
-        // Office per-day: total dollars / provider-days worked.
+        // Office per-day: office dollars / days the office was open.
         const dailyRate = (d) => (
-          d.providerDays >= MIN_DAYS_FOR_RATE ? d.officeAmount / d.providerDays : null
+          d.officeDays >= MIN_DAYS_FOR_RATE ? d.dailyAmount / d.officeDays : null
         );
 
         const datasets = metric === 'daily'
@@ -1668,7 +1686,7 @@
 
       const customLabel = customStart && customEnd ? `${customStart} – ${customEnd}` : 'Custom';
       const chartTitle = metric === 'daily'
-        ? (type === 'production' ? 'Daily Production ($/provider-day)' : 'Daily Collections ($/provider-day)')
+        ? (type === 'production' ? 'Daily Net Production ($/office day)' : 'Daily Collections ($/office day)')
         : (type === 'production' ? 'Hourly Production ($/hr)' : 'Hourly Collections ($/hr)');
 
       return (
