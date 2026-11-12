@@ -532,6 +532,113 @@
     }
 
     // ── AssocLabs ─────────────────────────────────────────────────────────────
+    // ── Outstanding A/R ──────────────────────────────────────────────────────
+    // A live snapshot (not tied to the selected month) of what is still owed on a
+    // provider's work. Insurance is exact: the estimate on every unpaid line of an
+    // open claim. The patient side is not: OpenDental's provider ledger reads
+    // about $81k owed on Dr. Thanh's work (Oct 2026), but that is an artifact of payments
+    // posted with no provider (~$394k office-wide), and most of those patients'
+    // accounts are at $0. So the patient side starts from what each family really
+    // owes after pending insurance (this totals within 0.4% of OpenDental's own
+    // aging), then attributes it to the newest charges first — payments clear the
+    // oldest charges, so the unpaid balance sits on the most recent work.
+    const PENDING_CLAIMPROC = "cp.Status=0 AND c.ClaimStatus IN ('U','W','S','H')";
+
+    async function loadOutstandingAR(provNum) {
+      const num = (v) => parseFloat(v || 0);
+      const [insLines, famRows] = await Promise.all([
+        runQuery(`SELECT c.ClaimNum, c.DateSent, cp.ProcDate, cp.InsPayEst FROM claimproc cp JOIN claim c ON c.ClaimNum=cp.ClaimNum WHERE cp.ProvNum=${provNum} AND ${PENDING_CLAIMPROC}`),
+        runQuery(`SELECT p.Guarantor AS g, SUM(t.amt) AS bal, SUM(t.pend) AS pend FROM (
+            SELECT PatNum, ProcFee*(UnitQty+BaseUnits) AS amt, 0 AS pend FROM procedurelog WHERE ProcStatus=2
+            UNION ALL SELECT PatNum, AdjAmt, 0 FROM adjustment
+            UNION ALL SELECT PatNum, -SplitAmt, 0 FROM paysplit
+            UNION ALL SELECT PatNum, -(InsPayAmt+WriteOff), 0 FROM claimproc WHERE Status IN (1,4,5,7)
+            UNION ALL SELECT cp.PatNum, 0, cp.InsPayEst+cp.WriteOff FROM claimproc cp JOIN claim c ON c.ClaimNum=cp.ClaimNum WHERE ${PENDING_CLAIMPROC}
+          ) t JOIN patient p ON p.PatNum=t.PatNum GROUP BY p.Guarantor`),
+      ]);
+
+      const ninetyDaysAgo = Date.now() - 90 * 864e5;
+      let insurance = 0, insuranceOver90 = 0;
+      const claims = new Set();
+      for (const r of insLines) {
+        const est = num(r.InsPayEst);
+        insurance += est;
+        claims.add(r.ClaimNum);
+        const sent = r.DateSent && !r.DateSent.startsWith('0001') ? r.DateSent : r.ProcDate;
+        if (new Date(sent).getTime() < ninetyDaysAgo) insuranceOver90 += est;
+      }
+
+      // Patient portion each family owes, across all providers.
+      const owed = {};
+      for (const f of famRows) {
+        const patPortion = num(f.bal) - num(f.pend);
+        if (patPortion > 0.005) owed[f.g] = patPortion;
+      }
+      const guarantors = Object.keys(owed);
+
+      let patient = 0, families = 0;
+      if (guarantors.length) {
+        const procs = await runQuery(`SELECT p.Guarantor AS g, pl.ProvNum, pl.ProcDate, pl.ProcFee*(pl.UnitQty+pl.BaseUnits) AS fee,
+            IFNULL((SELECT SUM(InsPayAmt+WriteOff) FROM claimproc WHERE ProcNum=pl.ProcNum AND Status IN (1,4,5,7)),0) AS insrec,
+            IFNULL((SELECT SUM(cp.InsPayEst+cp.WriteOff) FROM claimproc cp JOIN claim c ON c.ClaimNum=cp.ClaimNum WHERE cp.ProcNum=pl.ProcNum AND ${PENDING_CLAIMPROC}),0) AS inspend,
+            IFNULL((SELECT SUM(AdjAmt) FROM adjustment WHERE ProcNum=pl.ProcNum),0) AS adj
+          FROM procedurelog pl JOIN patient p ON p.PatNum=pl.PatNum
+          WHERE pl.ProcStatus=2 AND p.Guarantor IN (${guarantors.join(',')})`);
+        const byFamily = {};
+        for (const r of procs) (byFamily[r.g] ||= []).push(r);
+        for (const g of guarantors) {
+          let left = owed[g], mine = 0;
+          const newestFirst = (byFamily[g] || []).sort((a, b) => (a.ProcDate < b.ProcDate ? 1 : a.ProcDate > b.ProcDate ? -1 : 0));
+          for (const r of newestFirst) {
+            if (left <= 0.005) break;
+            const patCharge = num(r.fee) + num(r.adj) - num(r.insrec) - num(r.inspend);
+            if (patCharge <= 0) continue;
+            const take = Math.min(left, patCharge);
+            left -= take;
+            if (Number(r.ProvNum) === provNum) mine += take;
+          }
+          if (mine > 0.005) { patient += mine; families++; }
+        }
+      }
+
+      return { insurance, insuranceOver90, claimCount: claims.size, patient, families };
+    }
+
+    function OutstandingAR({ provNum }) {
+      const [data, setData] = React.useState(null);
+      const [error, setError] = React.useState(null);
+
+      React.useEffect(() => {
+        let cancelled = false;
+        loadOutstandingAR(provNum)
+          .then(d => { if (!cancelled) setData(d); })
+          .catch(e => { if (!cancelled) setError(e.message); });
+        return () => { cancelled = true; };
+      }, [provNum]);
+
+      return (
+        <div className="report-section">
+          <div className="report-section-header">Outstanding A/R <span>as of {new Date().toLocaleDateString()}</span></div>
+          {error ? <div className="error-box" style={{margin:20}}>Error: {error}</div>
+            : !data ? <div className="loading"><span className="spinner"></span> Loading outstanding A/R...</div>
+            : (
+              <div className="stat-grid">
+                <div className="stat-card">
+                  <div className="stat-label">Insurance Outstanding</div>
+                  <div className="stat-value">{fmt(data.insurance)}</div>
+                  <div className="stat-sub">{data.claimCount} open claims · {fmt(data.insuranceOver90)} over 90 days</div>
+                </div>
+                <div className="stat-card">
+                  <div className="stat-label">Patient Outstanding</div>
+                  <div className="stat-value">{fmt(data.patient)}</div>
+                  <div className="stat-sub">{data.families} {data.families === 1 ? 'family' : 'families'}</div>
+                </div>
+              </div>
+            )}
+        </div>
+      );
+    }
+
     function AssocLabs({ month, isAdmin }) {
       const [data, setData] = React.useState(null);
       const [loading, setLoading] = React.useState(true);
@@ -599,6 +706,8 @@
               </table>
             </div>
           )}
+
+          <OutstandingAR provNum={PROV_ASSOC} />
 
           {/* LAB CASE DETAILS */}
           <div className="report-section">
