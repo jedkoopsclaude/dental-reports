@@ -1001,13 +1001,16 @@
     const pctOf = (v, total) => total ? `${Math.round(v / total * 100)}%` : '';
 
     // Writes each bar's total above it, summing only the series still shown (a
-    // legend click can hide one). Skipped when bars get too narrow to fit it.
+    // legend click can hide one). Narrow bars get a shorter label ($178k), and
+    // none at all once even that would collide.
     const stackTotalsPlugin = {
       id: 'stackTotals',
       afterDatasetsDraw(chart) {
         const visible = chart.data.datasets.map((_, i) => i).filter(i => chart.isDatasetVisible(i));
         const count = chart.data.labels.length;
-        if (!visible.length || !count || chart.chartArea.width / count < 52) return;
+        const slot = count ? chart.chartArea.width / count : 0;
+        if (!visible.length || slot < 34) return;
+        const label = slot >= 60 ? fmtK : (v) => '$' + Math.round(v / 1000) + 'k';
         const { ctx } = chart;
         ctx.save();
         ctx.font = '600 12px Inter, sans-serif';
@@ -1017,7 +1020,7 @@
         chart.data.labels.forEach((_, idx) => {
           const total = visible.reduce((s, i) => s + (chart.data.datasets[i].data[idx] || 0), 0);
           const top = Math.min(...visible.map(i => chart.getDatasetMeta(i).data[idx].y));
-          ctx.fillText(fmtK(total), chart.getDatasetMeta(visible[0]).data[idx].x, top - 4);
+          ctx.fillText(label(total), chart.getDatasetMeta(visible[0]).data[idx].x, top - 4);
         });
         ctx.restore();
       },
@@ -1172,6 +1175,14 @@
           if (chartInstance.current) { chartInstance.current.destroy(); chartInstance.current = null; }
         };
       }, [type, range, groupBy, customStart, customEnd]);
+
+      // The chart is built while its wrapper is still display:none for the
+      // loading state. Chart.js usually catches the reveal on its own, but not
+      // when the collections table mounts in the same render and shifts the
+      // layout; it then stays at 0x0. Size it once loading is done.
+      React.useEffect(() => {
+        if (!loading && chartInstance.current) chartInstance.current.resize();
+      }, [loading]);
 
       // Custom range label
       const customLabel = customStart && customEnd
