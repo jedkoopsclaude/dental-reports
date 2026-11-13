@@ -992,6 +992,76 @@
       return Object.values(buckets);
     };
 
+    // Collections Trends is one stacked bar per period: the bar's height is
+    // total collections, split into insurance (the base) and patient payments.
+    // Darker steps of the app's blue/amber, so both segments hold up on white
+    // and stay distinct for colorblind readers.
+    const COLL_COLORS = { insurance: '#1576B0', patient: '#C98A00' };
+    const fmtK = (v) => v >= 1e6 ? `$${(v / 1e6).toFixed(2)}M` : `$${(v / 1000).toFixed(1)}k`;
+    const pctOf = (v, total) => total ? `${Math.round(v / total * 100)}%` : '';
+
+    // Writes each bar's total above it, summing only the series still shown (a
+    // legend click can hide one). Skipped when bars get too narrow to fit it.
+    const stackTotalsPlugin = {
+      id: 'stackTotals',
+      afterDatasetsDraw(chart) {
+        const visible = chart.data.datasets.map((_, i) => i).filter(i => chart.isDatasetVisible(i));
+        const count = chart.data.labels.length;
+        if (!visible.length || !count || chart.chartArea.width / count < 52) return;
+        const { ctx } = chart;
+        ctx.save();
+        ctx.font = '600 12px Inter, sans-serif';
+        ctx.fillStyle = '#333333';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        chart.data.labels.forEach((_, idx) => {
+          const total = visible.reduce((s, i) => s + (chart.data.datasets[i].data[idx] || 0), 0);
+          const top = Math.min(...visible.map(i => chart.getDatasetMeta(i).data[idx].y));
+          ctx.fillText(fmtK(total), chart.getDatasetMeta(visible[0]).data[idx].x, top - 4);
+        });
+        ctx.restore();
+      },
+    };
+
+    function buildCollectionsChart(canvas, labels, points) {
+      const bar = { stack: 'collections', maxBarThickness: 56, categoryPercentage: 0.7, barPercentage: 0.9, borderSkipped: false };
+      return new Chart(canvas, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            // The white top border is a 2px seam between the two segments.
+            { ...bar, label: 'Insurance', data: points.map(d => d.insurance), backgroundColor: COLL_COLORS.insurance,
+              borderColor: '#FFFFFF', borderWidth: { top: 2, right: 0, bottom: 0, left: 0 } },
+            { ...bar, label: 'Patient', data: points.map(d => d.patient), backgroundColor: COLL_COLORS.patient,
+              borderRadius: { topLeft: 4, topRight: 4, bottomLeft: 0, bottomRight: 0 } },
+          ],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          layout: { padding: { top: 22 } },
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { position: 'top', labels: { usePointStyle: true, pointStyle: 'rectRounded', color: '#333333' } },
+            tooltip: {
+              callbacks: {
+                label: (c) => ` ${c.dataset.label}: ${fmt(c.raw)} (${pctOf(c.raw, points[c.dataIndex].total)})`,
+                footer: (items) => `Total: ${fmt(points[items[0].dataIndex].total)}`,
+              },
+            },
+          },
+          scales: {
+            x: { stacked: true, grid: { display: false } },
+            y: {
+              stacked: true, beginAtZero: true, grid: { color: '#EEF0F2' }, border: { display: false },
+              ticks: { color: '#6B7280', callback: (v) => '$' + (v / 1000).toFixed(0) + 'k' },
+            },
+          },
+        },
+        plugins: [stackTotalsPlugin],
+      });
+    }
+
     function ChartView({ type, range, groupBy, customStart, customEnd, onRangeChange, onGroupByChange, onCustomRangeChange }) {
       const chartRef = React.useRef(null);
       const chartInstance = React.useRef(null);
@@ -1000,6 +1070,7 @@
       const [pendingEnd, setPendingEnd] = React.useState('');
       const [loading, setLoading] = React.useState(false);
       const [error, setError] = React.useState(null);
+      const [collRows, setCollRows] = React.useState(null);
 
       // Default picker dates when opening
       const openPicker = () => {
@@ -1037,6 +1108,7 @@
 
           setLoading(true);
           setError(null);
+          setCollRows(null);
           try {
             const rawMonthData = await Promise.all(months.map(async (m) => {
               const { startDate, endDate } = getMonthRange(m);
@@ -1067,19 +1139,17 @@
             const points = groupMonthData(rawMonthData, groupBy, type);
             const getLabel = (d) => d.label || fmtMonth(d.month);
 
-            let datasets;
-            if (type === 'production') {
-              datasets = [
+            if (type !== 'production') {
+              setCollRows(points.map(d => ({ label: getLabel(d), insurance: d.insurance, patient: d.patient, total: d.total })));
+              chartInstance.current = buildCollectionsChart(chartRef.current, points.map(getLabel), points);
+              return;
+            }
+
+            const datasets = [
                 { label: 'Gross Production',  data: points.map(d => d.gross), borderColor: '#18BFFF', backgroundColor: 'rgba(24,191,255,0.1)', tension: 0.3, fill: false, borderWidth: 2, pointRadius: 4 },
                 { label: 'Net Production',    data: points.map(d => d.net),   borderColor: '#22C55E', backgroundColor: 'rgba(34,197,94,0.1)',   tension: 0.3, fill: false, borderWidth: 2, pointRadius: 4 },
                 { label: `Breakeven ($${({'month':185,'quarter':555,'semiannual':1110,'year':2220}[groupBy])}k)`, data: points.map(() => 185000 * {'month':1,'quarter':3,'semiannual':6,'year':12}[groupBy]), borderColor: '#EF4444', borderDash: [6,3], pointRadius: 0, fill: false, borderWidth: 2 },
               ];
-            } else {
-              datasets = [
-                { label: 'Insurance Collections', data: points.map(d => d.insurance), borderColor: '#18BFFF', backgroundColor: 'rgba(24,191,255,0.1)', tension: 0.3, fill: true, borderWidth: 2, pointRadius: 4 },
-                { label: 'Patient Collections',   data: points.map(d => d.patient),   borderColor: '#FCB400', backgroundColor: 'rgba(252,180,0,0.1)',    tension: 0.3, fill: true, borderWidth: 2, pointRadius: 4 },
-              ];
-            }
 
             chartInstance.current = new Chart(chartRef.current, {
               type: 'line',
@@ -1165,6 +1235,43 @@
           <div className="chart-canvas-wrap" style={{display: loading ? 'none' : 'block'}}>
             <canvas ref={chartRef}></canvas>
           </div>
+
+          {collRows && !loading && (() => {
+            const sum = (k) => collRows.reduce((s, r) => s + r[k], 0);
+            const all = { insurance: sum('insurance'), patient: sum('patient'), total: sum('total') };
+            const swatch = (c) => <span style={{display:'inline-block',width:10,height:10,borderRadius:2,background:c,marginRight:6}}></span>;
+            const share = (v, t) => <span style={{color:'var(--text-muted)',fontSize:12,marginLeft:6}}>{pctOf(v, t)}</span>;
+            return (
+              <div style={{overflowX:'auto',marginTop:20}}>
+                <table className="report-table">
+                  <thead>
+                    <tr>
+                      <th>Period</th>
+                      <th className="money">{swatch(COLL_COLORS.insurance)}Insurance</th>
+                      <th className="money">{swatch(COLL_COLORS.patient)}Patient</th>
+                      <th className="money">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {collRows.map(r => (
+                      <tr key={r.label}>
+                        <td>{r.label}</td>
+                        <td className="money">{fmt(r.insurance)}{share(r.insurance, r.total)}</td>
+                        <td className="money">{fmt(r.patient)}{share(r.patient, r.total)}</td>
+                        <td className="money" style={{fontWeight:600}}>{fmt(r.total)}</td>
+                      </tr>
+                    ))}
+                    <tr className="total">
+                      <td>Total</td>
+                      <td className="money">{fmt(all.insurance)}{share(all.insurance, all.total)}</td>
+                      <td className="money">{fmt(all.patient)}{share(all.patient, all.total)}</td>
+                      <td className="money">{fmt(all.total)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            );
+          })()}
         </div>
       );
     }
