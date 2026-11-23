@@ -559,11 +559,13 @@
 
       const ninetyDaysAgo = Date.now() - 90 * 864e5;
       let insurance = 0, insuranceOver90 = 0;
-      const claims = new Set();
+      // Per-claim totals: a claim whose lines for this provider are all $0 (typically a
+      // secondary on hold until the primary pays) is not money owed, so it is not counted.
+      const claimEst = {};
       for (const r of insLines) {
         const est = num(r.InsPayEst);
         insurance += est;
-        claims.add(r.ClaimNum);
+        claimEst[r.ClaimNum] = (claimEst[r.ClaimNum] || 0) + est;
         const sent = r.DateSent && !r.DateSent.startsWith('0001') ? r.DateSent : r.ProcDate;
         if (new Date(sent).getTime() < ninetyDaysAgo) insuranceOver90 += est;
       }
@@ -601,7 +603,8 @@
         }
       }
 
-      return { insurance, insuranceOver90, claimCount: claims.size, patient, families };
+      const claimCount = Object.values(claimEst).filter(v => v > 0.005).length;
+      return { insurance, insuranceOver90, claimCount, patient, families };
     }
 
     function OutstandingAR({ provNum }) {
